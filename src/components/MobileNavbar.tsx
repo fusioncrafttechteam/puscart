@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { Menu, MapPin, X, BarChart3, Home, ShoppingBag, Tag, Image, ClipboardList, Users } from 'lucide-react';
-import { useLocation as useLiveLocation } from '../hooks/useLocation';
+import { Menu, X, BarChart3, Home, ShoppingBag, Tag, Image, ClipboardList, Users } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
 interface MobileNavbarProps {
@@ -12,20 +11,8 @@ interface MobileNavbarProps {
 
 const MobileNavbar: React.FC<MobileNavbarProps> = ({ isAuthenticated, isAdmin = false }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const locationData = useLiveLocation();
   const currentRoute = useLocation();
-  const liveLocation = locationData.latitude && locationData.longitude ? {
-    latitude: locationData.latitude,
-    longitude: locationData.longitude,
-    city: locationData.locationName || 'Current Location'
-  } : null;
   const { signOut } = useAuth();
-  const loading = locationData.loading;
-  const error =
-  locationData.locationName === "Enable location";
-  const getCurrentLocation = () => {
-  locationData.refreshLocation();
-};
   const navigate = useNavigate();
 
   // Check if current route is admin route
@@ -88,29 +75,7 @@ const MobileNavbar: React.FC<MobileNavbarProps> = ({ isAuthenticated, isAdmin = 
             />
           </Link>
 
-          {/* Delivery Location - Center */}
-          <div className="absolute left-1/2 transform -translate-x-1/2">
-            <button 
-              onClick={getCurrentLocation}
-              className="flex items-center space-x-1 text-sm text-white hover:text-blue-100 transition-colors"
-              title="Click to refresh location"
-              disabled={loading}
-            >
-              <MapPin className={`w-4 h-4 ${loading ? 'animate-pulse' : ''}`} />
-              <span className="truncate max-w-[120px]">
-                {loading ? (
-  <span className="animate-pulse">Detecting...</span>
-) : error ? (
-  <span className="text-red-300">Enable location</span>
-) : liveLocation?.city ? (
-  liveLocation.city
-) : (
-  "Tap to detect"
-)}
-              </span>
-            </button>
-          </div>
-
+          
           {/* Hamburger Menu - Right */}
           <button
             onClick={() => setIsMenuOpen(!isMenuOpen)}

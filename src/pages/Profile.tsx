@@ -400,16 +400,7 @@ const Profile: React.FC = () => {
           
           <div className="border-t border-gray-100"></div>
           
-          <button 
-            onClick={handleLogout}
-            className="w-full px-6 py-4 flex items-center justify-between hover:bg-red-50 transition-colors"
-          >
-            <div className="flex items-center">
-              <LogOut className="w-5 h-5 text-red-600 mr-3" />
-              <span className="text-red-600 font-medium">Logout</span>
-            </div>
-            <ChevronRight className="w-5 h-5 text-red-400" />
-          </button>
+         
         </div>
 
         {/* Mobile Logout Button - Always visible on mobile */}

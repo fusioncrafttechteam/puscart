@@ -7,7 +7,6 @@ import AddressCard from '../components/checkout/AddressCard';
 import AddAddressModal from '../components/checkout/AddAddressModal';
 import type { UserAddress, AddressFormData } from '../types/address';
 import { Plus, MapPin } from 'lucide-react';
-import { createOrder, updateOrderPayment } from '../services/orderService';
 import { createRazorpayOrder, verifyPayment, loadRazorpayScript } from '../services/razorpayService';
 
 const Checkout: React.FC = () => {
@@ -114,6 +113,18 @@ const Checkout: React.FC = () => {
       return;
     }
 
+    // Validate user ID format
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(appUser.id)) {
+      alert('Invalid user session. Please login again.');
+      return;
+    }
+
+    // Step 5: Prevent double-click checkout
+    if (isProcessing) {
+      return;
+    }
+
     setIsProcessing(true);
 
     try {
@@ -126,37 +137,26 @@ const Checkout: React.FC = () => {
       // Format delivery address string
       const formattedAddress = `${selectedAddress.address_line_1}${selectedAddress.address_line_2 ? ', ' + selectedAddress.address_line_2 : ''}, ${selectedAddress.city}, ${selectedAddress.state} - ${selectedAddress.pincode}`;
 
-      // Create order in database
-      const orderData = {
-        user_id: appUser.id,
-        total_amount: total,
-        delivery_address_id: selectedAddressId,
-        delivery_address: formattedAddress,
-        phone: selectedAddress.phone_number,
-        items: cartState.items.map(item => ({
-          product_id: item.product.id,
-          quantity: item.quantity,
-          price: item.product.offer_price || item.product.price
-        }))
-      };
-
-      const order = await createOrder(orderData);
-
       // Load Razorpay script
       const scriptLoaded = await loadRazorpayScript();
       if (!scriptLoaded) {
         throw new Error('Failed to load Razorpay SDK');
       }
 
-      // Create Razorpay order
-      const razorpayOrder = await createRazorpayOrder(total);
-
-      // Update order with Razorpay order ID
-      await updateOrderPayment(order.id, {
-        razorpay_order_id: razorpayOrder.id,
-        razorpay_payment_id: '',
-        payment_status: 'pending' as const
+      // Create Razorpay order with complete order data
+      const razorpayOrder = await createRazorpayOrder({
+        amount: total,
+        user_id: appUser.id,
+        delivery_address: formattedAddress,
+        phone: selectedAddress.phone_number,
+        cart_items: cartState.items.map(item => ({
+          product_id: item.product.id,
+          quantity: item.quantity,
+          price: item.product.offer_price || item.product.price
+        }))
       });
+
+      // Order is already created in backend with Razorpay order ID, no need to update
 
       // Open Razorpay checkout
       const options = {
@@ -164,10 +164,50 @@ const Checkout: React.FC = () => {
         amount: razorpayOrder.amount,
         currency: 'INR',
         name: 'Puscart Delivery',
-        description: 'Order Payment',
-        order_id: razorpayOrder.id,
+        description: `Order #${razorpayOrder.order_id}`,
+        order_id: razorpayOrder.razorpay_order_id,
+        image: '/src/assets/Puscart logo.jpeg',
+        prefill: {
+          name: appUser?.name || '',
+          email: appUser?.email || '',
+          contact: selectedAddress.phone_number || ''
+        },
+        notes: {
+          address: formattedAddress,
+          order_id: razorpayOrder.order_id,
+          user_id: appUser.id
+        },
+        config: {
+          display: {
+            blocks: {
+              banks: {
+                name: 'Pay using UPI Apps',
+                instruments: [
+                  {
+                    method: 'upi',
+                    apps: ['gpay', 'phonepe', 'paytm', 'bhim']
+                  }
+                ]
+              }
+            },
+            hide: [
+              {
+                method: 'card'
+              },
+              {
+                method: 'wallet'
+              }
+            ],
+            sequence: ['block.banks', 'block.upi'],
+            preferences: {
+              show_default_blocks: true
+            }
+          }
+        },
         handler: async function (response: any) {
           try {
+            console.log('Razorpay response:', response);
+            
             // Verify payment with backend
             await verifyPayment({
               razorpay_payment_id: response.razorpay_payment_id,
@@ -175,42 +215,35 @@ const Checkout: React.FC = () => {
               razorpay_signature: response.razorpay_signature
             });
 
-            // Update order status to paid
-            await updateOrderPayment(order.id, {
-              razorpay_order_id: response.razorpay_order_id,
-              razorpay_payment_id: response.razorpay_payment_id,
-              payment_status: 'paid'
-            });
-
-            // Clear cart
-            // TODO: Clear cart after successful payment
+            console.log('Payment verified successfully');
+            
+            // Clear cart after successful payment
+            // TODO: Implement cart clearing
             
             // Redirect to success page
-            navigate('/order-success', { state: { orderId: order.id } });
+            navigate('/order-success', { state: { orderId: razorpayOrder.order_id } });
           } catch (error) {
             console.error('Payment verification failed:', error);
-            // Update order status to failed
-            await updateOrderPayment(order.id, {
-              razorpay_order_id: response.razorpay_order_id,
-              razorpay_payment_id: response.razorpay_payment_id,
-              payment_status: 'failed'
-            });
-            alert('Payment verification failed. Please contact support.');
+            alert('Payment verification failed. Please contact support if amount was deducted.');
           }
         },
         modal: {
           ondismiss: async function () {
-            // Update order status to failed when modal is closed
-            await updateOrderPayment(order.id, {
-              razorpay_order_id: razorpayOrder.id,
-              razorpay_payment_id: '',
-              payment_status: 'failed'
-            });
-            alert('Payment cancelled. You can retry payment.');
-          }
+            console.log('Payment modal dismissed');
+            setIsProcessing(false);
+          },
+          escape: true,
+          handleback: true,
+          confirm_close: true,
+          animation: 'fade'
         },
         theme: {
-          color: '#00C4CC'
+          color: '#00C4CC',
+          backdrop_color: '#ffffff'
+        },
+        retry: {
+          enabled: true,
+          max_count: 4
         }
       };
 
@@ -319,9 +352,13 @@ const Checkout: React.FC = () => {
                 {cartState.items.map((item) => (
                   <div key={item.product.id} className="flex items-center space-x-3">
                     <img
-                      src={item.product.image}
+                      src={item.product.image?.replace('http://localhost:', 'https://') || item.product.image}
                       alt={item.product.name}
                       className="w-12 h-12 object-cover rounded-lg"
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement;
+                        target.src = '/src/assets/Puscart logo.jpeg';
+                      }}
                     />
                     <div className="flex-1">
                       <p className="text-sm font-medium text-gray-900">{item.product.name}</p>

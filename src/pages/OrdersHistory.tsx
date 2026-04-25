@@ -1,18 +1,62 @@
 import React, { useState, useEffect } from 'react';
 import { Package, MapPin, Phone, Calendar } from 'lucide-react';
 import { getUserOrders, type OrderWithItems } from '../services/orderService';
+import { useAuth } from '../contexts/AuthContext';
+
+// Load orders from localStorage
+const loadOrdersFromStorage = (): OrderWithItems[] | null => {
+  try {
+    const savedOrders = localStorage.getItem('puscart_orders');
+    if (savedOrders) {
+      const orders = JSON.parse(savedOrders);
+      // Check if orders are less than 5 minutes old
+      const timestamp = localStorage.getItem('puscart_orders_timestamp');
+      if (timestamp) {
+        const age = Date.now() - parseInt(timestamp);
+        if (age < 5 * 60 * 1000) { // 5 minutes
+          return orders;
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Error loading orders from localStorage:', error);
+  }
+  return null;
+};
 
 const OrdersHistory: React.FC = () => {
+  const { user } = useAuth();
   const [orders, setOrders] = useState<OrderWithItems[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchOrders = async () => {
+      if (!user) {
+        setLoading(false);
+        return;
+      }
+
       try {
-        setLoading(true);
+        // First try to load from localStorage for instant response
+        const cachedOrders = loadOrdersFromStorage();
+        if (cachedOrders) {
+          setOrders(cachedOrders);
+          setLoading(false);
+        }
+
+        // Then fetch fresh data from database
         const userOrders = await getUserOrders();
         setOrders(userOrders);
+        
+        // Save to localStorage with timestamp
+        try {
+          localStorage.setItem('puscart_orders', JSON.stringify(userOrders));
+          localStorage.setItem('puscart_orders_timestamp', Date.now().toString());
+        } catch (error) {
+          console.error('Error saving orders to localStorage:', error);
+        }
+        
         setError(null);
       } catch (err) {
         console.error('Error fetching orders:', err);
@@ -23,7 +67,7 @@ const OrdersHistory: React.FC = () => {
     };
 
     fetchOrders();
-  }, []);
+  }, [user]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -116,10 +160,10 @@ const OrdersHistory: React.FC = () => {
                   <div className="mt-4 md:mt-0 text-right">
                     <p className="font-bold text-gray-900 text-xl">Rs.{order.total_amount}</p>
                     <div className="mt-2 space-y-1">
-                      <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(order.payment_status)}`}>
+                      <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(order.payment_status)}`}>Payment:
                         {order.payment_status}
                       </span>
-                      <span className={`ml-2 inline-block px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(order.delivery_status)}`}>
+                      <span className={`ml-2 inline-block px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(order.delivery_status)}`}>Order:
                         {order.delivery_status}
                       </span>
                     </div>

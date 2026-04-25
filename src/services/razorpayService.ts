@@ -1,17 +1,11 @@
 
 export interface RazorpayOrder {
-  id: string
-  entity: string
+  razorpay_order_id: string
   amount: number
-  amount_paid: number
-  amount_due: number
   currency: string
   receipt: string
-  offer_id: string | null
   status: string
-  attempts: number
-  notes: any[]
-  created_at: number
+  order_id: string
 }
 
 export interface PaymentVerification {
@@ -21,18 +15,42 @@ export interface PaymentVerification {
 }
 
 // Create Razorpay order
-export const createRazorpayOrder = async (amount: number): Promise<RazorpayOrder> => {
+export const createRazorpayOrder = async (orderData: {
+  amount: number;
+  user_id: string;
+  delivery_address: string;
+  phone: string;
+  cart_items: Array<{
+    product_id: string;
+    quantity: number;
+    price: number;
+  }>;
+}): Promise<RazorpayOrder & { order_id: string }> => {
   try {
-    const response = await fetch('http://localhost:3003/api/create-razorpay-order', {
+    // Use relative URL for production compatibility
+    const baseUrl = import.meta.env.PROD ? '' : 'http://192.168.1.4:3001';
+    const response = await fetch(`${baseUrl}/api/create-razorpay-order`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ amount }),
+      body: JSON.stringify(orderData),
     })
 
     if (!response.ok) {
-      throw new Error('Failed to create Razorpay order')
+      const errorData = await response.json()
+      console.error('Backend error:', errorData)
+      
+      // Provide specific error messages based on the error type
+      if (errorData.error?.includes('Invalid user_id format')) {
+        throw new Error('Invalid user session. Please login again and try.')
+      } else if (errorData.error?.includes('Invalid product_id format')) {
+        throw new Error('Invalid product data. Please refresh the page and try again.')
+      } else if (errorData.error?.includes('violates foreign key constraint')) {
+        throw new Error('User account not found. Please login again.')
+      } else {
+        throw new Error(errorData.error || 'Failed to create Razorpay order')
+      }
     }
 
     const order = await response.json()
@@ -46,7 +64,9 @@ export const createRazorpayOrder = async (amount: number): Promise<RazorpayOrder
 // Verify payment
 export const verifyPayment = async (paymentData: PaymentVerification): Promise<void> => {
   try {
-    const response = await fetch('http://localhost:3003/api/verify-payment', {
+    // Use relative URL for production compatibility
+    const baseUrl = import.meta.env.PROD ? '' : 'http://192.168.1.4:3001';
+    const response = await fetch(`${baseUrl}/api/verify-payment`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -65,13 +85,30 @@ export const verifyPayment = async (paymentData: PaymentVerification): Promise<v
   }
 }
 
-// Load Razorpay script
+// Load Razorpay script with proper error handling
 export const loadRazorpayScript = (): Promise<boolean> => {
   return new Promise((resolve) => {
+    // Check if script is already loaded
+    if ((window as any).Razorpay) {
+      resolve(true)
+      return
+    }
+
     const script = document.createElement('script')
     script.src = 'https://checkout.razorpay.com/v1/checkout.js'
-    script.onload = () => resolve(true)
-    script.onerror = () => resolve(false)
-    document.body.appendChild(script)
+    script.async = true
+    script.defer = true
+    
+    script.onload = () => {
+      console.log('Razorpay script loaded successfully')
+      resolve(true)
+    }
+    
+    script.onerror = (error) => {
+      console.error('Failed to load Razorpay script:', error)
+      resolve(false)
+    }
+    
+    document.head.appendChild(script)
   })
 }

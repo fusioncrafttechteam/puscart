@@ -45,6 +45,19 @@ export const useAuth = () => {
   return context
 }
 
+// Load user profile from localStorage
+const loadProfileFromStorage = (userId: string): AppUser | null => {
+  try {
+    const savedProfile = localStorage.getItem(`puscart_profile_${userId}`);
+    if (savedProfile) {
+      return JSON.parse(savedProfile);
+    }
+  } catch (error) {
+    console.error('Error loading profile from localStorage:', error);
+  }
+  return null;
+};
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null)
   const [appUser, setAppUser] = useState<AppUser | null>(null)
@@ -112,11 +125,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const fetchUserProfile = async (userId: string) => {
     try {
+      // First try to load from localStorage for instant response
+      const cachedProfile = loadProfileFromStorage(userId);
+      if (cachedProfile) {
+        setAppUser(cachedProfile);
+        setLoading(false);
+      }
+
+      // Then fetch fresh data from database
       const { data, error } = await supabase
         .from('users')
         .select('*')
         .eq('id', userId)
         .single()
+
+      let profileData: AppUser;
 
       if (error) {
         // If profile not found, create a basic one
@@ -138,52 +161,60 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             .single()
 
           if (!createError && userData) {
-            setAppUser(userData)
+            profileData = userData;
           } else {
             // Set minimal user object as fallback
-            setAppUser({
+            profileData = {
               id: userId,
               name: 'User',
               email: '',
               phone: '',
-              role: 'user',
+              role: 'user' as const,
               profile_image: '',
               is_blocked: false,
               created_at: new Date().toISOString(),
               updated_at: new Date().toISOString()
-            })
+            };
           }
         } else {
           // Set minimal user object as fallback
-          setAppUser({
+          profileData = {
             id: userId,
             name: 'User',
             email: '',
             phone: '',
-            role: 'user',
+            role: 'user' as const,
             profile_image: '',
             is_blocked: false,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString()
-          })
+          };
         }
-        return
+      } else {
+        profileData = data;
       }
 
-      setAppUser(data)
+      // Save to localStorage and update state
+      try {
+        localStorage.setItem(`puscart_profile_${userId}`, JSON.stringify(profileData));
+      } catch (error) {
+        console.error('Error saving profile to localStorage:', error);
+      }
+      setAppUser(profileData);
     } catch (error) {
       // Set minimal user object as fallback
-      setAppUser({
+      const fallbackProfile = {
         id: userId,
         name: 'User',
         email: '',
         phone: '',
-        role: 'user',
+        role: 'user' as const,
         profile_image: '',
         is_blocked: false,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
-      })
+      };
+      setAppUser(fallbackProfile);
     }
   }
 
