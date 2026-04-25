@@ -4,7 +4,6 @@ import { supabase } from '../../services/supabase'
 import {
   EyeIcon,
   MagnifyingGlassIcon,
-  ChartBarIcon,
   ShoppingBagIcon,
   TagIcon,
   PhotoIcon,
