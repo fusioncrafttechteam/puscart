@@ -9,6 +9,8 @@ import type { UserAddress, AddressFormData } from '../types/address';
 import { Plus, MapPin } from 'lucide-react';
 import { createRazorpayOrder, verifyPayment, loadRazorpayScript } from '../services/razorpayService';
 
+import logo from '../assets/Puscart logo.jpeg'
+
 const Checkout: React.FC = () => {
     const { state: cartState } = useCart();
   const { appUser } = useAuth();
@@ -166,7 +168,7 @@ const Checkout: React.FC = () => {
         name: 'Puscart Delivery',
         description: `Order #${razorpayOrder.order_id}`,
         order_id: razorpayOrder.razorpay_order_id,
-        image: '/src/assets/Puscart logo.jpeg',
+        image: logo,
         prefill: {
           name: appUser?.name || '',
           email: appUser?.email || '',
@@ -357,7 +359,7 @@ const Checkout: React.FC = () => {
                       className="w-12 h-12 object-cover rounded-lg"
                       onError={(e) => {
                         const target = e.target as HTMLImageElement;
-                        target.src = '/src/assets/Puscart logo.jpeg';
+                        target.src = logo;
                       }}
                     />
                     <div className="flex-1">

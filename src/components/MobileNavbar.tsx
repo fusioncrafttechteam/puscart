@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Menu, X, BarChart3, Home, ShoppingBag, Tag, Image, ClipboardList, Users } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import logo from '../assets/Puscart logo.jpeg';
 
 interface MobileNavbarProps {
   isAuthenticated: boolean;
@@ -69,7 +70,7 @@ const MobileNavbar: React.FC<MobileNavbarProps> = ({ isAuthenticated, isAdmin = 
           {/* Logo - Left */}
           <Link to="/" className="flex items-center">
             <img 
-              src="/src/assets/Puscart logo.jpeg" 
+              src={logo} 
               alt="Puscart Logo" 
               className="w-8 h-8 object-contain"
             />

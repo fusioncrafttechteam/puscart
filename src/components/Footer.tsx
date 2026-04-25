@@ -9,6 +9,8 @@ import {
   Truck,
 } from "lucide-react";
 
+import logo from '../assets/Puscart logo.jpeg'
+
 const Footer: React.FC = () => {
   const currentYear = new Date().getFullYear();
 
@@ -45,7 +47,7 @@ const Footer: React.FC = () => {
           <div className="space-y-4">
             <div className="flex items-center space-x-3 mb-6">
               <img 
-                src="/src/assets/Puscart logo.jpeg" 
+                src={logo} 
                 alt="Puscart Logo" 
                 className="w-10 h-10 object-contain rounded-lg"
               />

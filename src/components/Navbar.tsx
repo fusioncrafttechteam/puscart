@@ -17,6 +17,8 @@ import {
   ChevronDown
 } from 'lucide-react'
 
+import logo from '../assets/Puscart logo.jpeg'
+
 const Navbar: React.FC = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const { appUser, signOut, isAdmin } = useAuth()
@@ -54,7 +56,7 @@ const Navbar: React.FC = () => {
           <div className="flex items-center">
             <Link to="/" className="flex items-center space-x-3 group">
               <img 
-                src="/src/assets/Puscart logo.jpeg" 
+                src={logo} 
                 alt="Puscart Logo" 
                 className="w-12 h-12 object-contain rounded-lg shadow-md group-hover:shadow-lg transition-all duration-300 group-hover:scale-105"
               />
