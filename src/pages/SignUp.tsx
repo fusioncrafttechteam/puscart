@@ -2,6 +2,8 @@ import React, { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { EyeIcon, EyeSlashIcon, LockClosedIcon, EnvelopeIcon, UserIcon, PhoneIcon } from '@heroicons/react/24/outline'
+import { calculatePasswordStrength } from '../utils/passwordStrength'
+import { validateEmail, validatePhone, validateName } from '../utils/validation'
 
 const SignUp: React.FC = () => {
   const [formData, setFormData] = useState({
@@ -32,23 +34,45 @@ const SignUp: React.FC = () => {
     setError('')
     setLoading(true)
 
+    // Validate name
+    const nameValidation = validateName(formData.name)
+    if (!nameValidation.isValid) {
+      setError(nameValidation.errors[0] || 'Invalid name')
+      setLoading(false)
+      return
+    }
+
+    // Validate email
+    const emailValidation = validateEmail(formData.email)
+    if (!emailValidation.isValid) {
+      setError(emailValidation.errors[0] || 'Invalid email')
+      setLoading(false)
+      return
+    }
+
+    // Validate phone
+    const phoneValidation = validatePhone(formData.phone)
+    if (!phoneValidation.isValid) {
+      setError(phoneValidation.errors[0] || 'Invalid phone number')
+      setLoading(false)
+      return
+    }
+
     if (formData.password !== formData.confirmPassword) {
       setError('Passwords do not match')
       setLoading(false)
       return
     }
 
-    if (formData.password.length < 6) {
-      setError('Password must be at least 6 characters long')
+    // Use password strength validation
+    const passwordValidation = calculatePasswordStrength(formData.password)
+    if (!passwordValidation.isValid) {
+      setError(passwordValidation.feedback[0] || 'Password must be at least 6 characters long')
       setLoading(false)
       return
     }
 
-    console.log("Submitting signup form with:", {
-      email: formData.email,
-      name: formData.name,
-      phone: formData.phone
-    })
+    // Submitting signup form
 
     const { error } = await signUp(
       formData.email,
@@ -58,8 +82,6 @@ const SignUp: React.FC = () => {
     )
 
     if (error) {
-      console.error("Signup failed:", error)
-      
       // Provide more specific error messages
       let errorMessage = 'An error occurred during sign up'
       
@@ -77,7 +99,6 @@ const SignUp: React.FC = () => {
       
       setError(errorMessage)
     } else {
-      console.log("Signup successful")
       setSuccess(true)
       setTimeout(() => {
         navigate('/signin')
@@ -192,6 +213,7 @@ const SignUp: React.FC = () => {
                   type="button"
                   className="absolute inset-y-0 right-0 pr-3 flex items-center"
                   onClick={() => setShowPassword(!showPassword)}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
                 >
                   {showPassword ? (
                     <EyeSlashIcon className="h-5 w-5 text-gray-400 hover:text-gray-600 transition-colors" />
@@ -224,6 +246,7 @@ const SignUp: React.FC = () => {
                   type="button"
                   className="absolute inset-y-0 right-0 pr-3 flex items-center"
                   onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  aria-label={showConfirmPassword ? "Hide confirm password" : "Show confirm password"}
                 >
                   {showConfirmPassword ? (
                     <EyeSlashIcon className="h-5 w-5 text-gray-400 hover:text-gray-600 transition-colors" />

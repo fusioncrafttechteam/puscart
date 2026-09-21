@@ -14,7 +14,8 @@ import {
   Search,
   Package,
   Heart,
-  ChevronDown
+  ChevronDown,
+  ClipboardList
 } from 'lucide-react'
 
 import logo from '../assets/Puscart logo.jpeg'
@@ -39,6 +40,7 @@ const Navbar: React.FC = () => {
   const navigation = [
     { name: 'Home', href: '/', icon: Home },
     { name: 'Shop', href: '/shop', icon: ShoppingBag },
+    { name: 'Orders', href: '/orders', icon: ClipboardList },
     { name: 'About', href: '/about', icon: Package },
     { name: 'Contact', href: '/contact', icon: Heart },
   ]
@@ -58,12 +60,17 @@ const Navbar: React.FC = () => {
               <img 
                 src={logo} 
                 alt="Puscart Logo" 
+                width="48"
+                height="48"
+                loading="eager"
+                fetchPriority="high"
+                decoding="async"
                 className="w-12 h-12 object-contain rounded-lg shadow-md group-hover:shadow-lg transition-all duration-300 group-hover:scale-105"
               />
               <div className="hidden sm:block">
-                <h1 className="text-xl font-bold bg-linear-to-r from-blue-600 to-blue-700 bg-clip-text text-transparent">
+                <div className="text-xl font-bold bg-linear-to-r from-blue-600 to-blue-700 bg-clip-text text-transparent">
                   Puscart
-                </h1>
+                </div>
                 <p className="text-xs text-gray-500">Delivery Service</p>
               </div>
             </Link>
@@ -221,6 +228,8 @@ const Navbar: React.FC = () => {
             {/* Mobile Menu Button */}
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
+              aria-expanded={mobileMenuOpen}
               className="lg:hidden p-3 bg-gray-50 hover:bg-gray-100 rounded-xl transition-all duration-200"
             >
               {mobileMenuOpen ? (

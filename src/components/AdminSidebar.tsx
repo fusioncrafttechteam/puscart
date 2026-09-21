@@ -8,7 +8,9 @@ import {
   PhotoIcon,
   ClipboardDocumentListIcon,
   UsersIcon,
-  ArrowRightOnRectangleIcon
+  CogIcon,
+  ArrowRightOnRectangleIcon,
+  ShieldCheckIcon
 } from '@heroicons/react/24/outline'
 
 interface AdminSidebarProps {
@@ -27,6 +29,8 @@ const AdminSidebar: React.FC<AdminSidebarProps> = ({ sidebarOpen, setSidebarOpen
     { name: 'Offer Banners', href: '/admin/banners', icon: PhotoIcon },
     { name: 'Orders', href: '/admin/orders', icon: ClipboardDocumentListIcon },
     { name: 'Users', href: '/admin/users', icon: UsersIcon },
+    { name: 'Delivery Settings', href: '/admin/delivery-settings', icon: CogIcon },
+    { name: 'Activity Logs', href: '/admin/activity-logs', icon: ShieldCheckIcon },
   ]
 
   const handleSignOut = async () => {

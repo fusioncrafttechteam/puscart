@@ -1,9 +1,26 @@
 @import "tailwindcss";
 
 @layer base {
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+  
   html, body {
     @apply bg-slate-50 font-sans antialiased overflow-x-hidden;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Mobile viewport optimization */
+  @media (max-width: 640px) {
+    html {
+      font-size: 14px;
+    }
+  }
+
+  /* Touch device optimizations */
+  @media (hover: none) and (pointer: coarse) {
+    button, .btn-primary, .btn-secondary {
+      @apply min-h-[44px] min-w-[44px];
+      touch-action: manipulation;
+    }
   }
 }
 
@@ -14,23 +31,91 @@
   
   .btn-primary {
     @apply bg-blue-500 hover:bg-blue-600 text-white font-medium py-3 px-6 rounded-xl transition-all duration-200 shadow-md hover:shadow-lg;
+    @apply focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2;
+    touch-action: manipulation;
   }
   
   .btn-secondary {
     @apply bg-sky-500 hover:bg-sky-600 text-white font-medium py-3 px-6 rounded-xl transition-all duration-200 shadow-md hover:shadow-lg;
+    @apply focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2;
+    touch-action: manipulation;
   }
   
   .product-card {
     @apply bg-white rounded-2xl shadow-md hover:shadow-lg transition-all duration-300 overflow-hidden;
+    @apply focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2;
   }
   
   .input-field {
     @apply w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200;
+    @apply disabled:opacity-50 disabled:cursor-not-allowed;
   }
 
   .sticky-nav {
     position: sticky;
     top: 0;
     z-index: 50;
+  }
+
+  /* Mobile-specific optimizations */
+  @media (max-width: 640px) {
+    .btn-primary, .btn-secondary {
+      @apply py-2.5 px-4 text-sm;
+    }
+    
+    .input-field {
+      @apply py-2.5 px-3 text-sm;
+    }
+  }
+
+  /* Payment-specific styles */
+  .payment-button {
+    @apply bg-linear-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700;
+    @apply text-white font-semibold py-4 px-6 rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl;
+    @apply disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2;
+    @apply min-h-[48px];
+    touch-action: manipulation;
+  }
+
+  /* Loading states */
+  .loading-spinner {
+    @apply animate-spin rounded-full border-2 border-gray-300 border-t-blue-600;
+  }
+
+  /* Error states */
+  .error-message {
+    @apply bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg;
+  }
+
+  .success-message {
+    @apply bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg;
+  }
+}
+
+@layer utilities {
+  /* Safe area insets for mobile devices */
+  .safe-area-top {
+    padding-top: env(safe-area-inset-top);
+  }
+  
+  .safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  /* Responsive text sizing */
+  .text-responsive-xs {
+    @apply text-xs sm:text-sm;
+  }
+  
+  .text-responsive-sm {
+    @apply text-sm sm:text-base;
+  }
+  
+  .text-responsive-base {
+    @apply text-base sm:text-lg;
+  }
+  
+  .text-responsive-lg {
+    @apply text-lg sm:text-xl lg:text-2xl;
   }
 }

@@ -1,15 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { Minus, Plus, Star, Truck, Shield, ArrowLeft } from 'lucide-react';
+import { Minus, Plus, Truck, Shield, ArrowLeft } from 'lucide-react';
 import { getProductById, getProducts } from '../services/productService';
 import { useCart } from '../contexts/CartContext';
 import ProductCard from '../components/ProductCard';
 import SkeletonLoader from '../components/SkeletonLoader';
+import MetaTags from '../components/MetaTags';
+import Breadcrumbs from '../components/Breadcrumbs';
+import { useRecentlyViewed } from '../hooks/useRecentlyViewed';
+import { generateProductSchema } from '../utils/seo';
 import type { ProductWithCategory } from '../types';
 
 const ProductDetails: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const { addItem } = useCart();
+  const { addRecentlyViewed } = useRecentlyViewed();
   const [quantity, setQuantity] = useState(1);
   const [selectedImage, setSelectedImage] = useState(0);
   const [product, setProduct] = useState<ProductWithCategory | null>(null);
@@ -28,8 +33,18 @@ const ProductDetails: React.FC = () => {
       setLoading(true);
       const data = await getProductById(id!);
       setProduct(data);
+      // Add to recently viewed
+      if (data) {
+        addRecentlyViewed({
+          id: data.id,
+          name: data.name,
+          image: data.image,
+          price: data.price,
+          offer_price: data.offer_price
+        });
+      }
     } catch (error) {
-      console.error('Error fetching product:', error);
+      // Error fetching product
     } finally {
       setLoading(false);
     }
@@ -40,7 +55,7 @@ const ProductDetails: React.FC = () => {
       const data = await getProducts();
       setRelatedProducts(data.slice(0, 4));
     } catch (error) {
-      console.error('Error fetching related products:', error);
+      // Error fetching related products
     }
   };
 
@@ -70,6 +85,7 @@ const ProductDetails: React.FC = () => {
   const hasDiscount = product.discount_percentage > 0;
   const currentPrice = hasDiscount ? product.price * (1 - product.discount_percentage / 100) : product.price;
   const discountPercentage = product.discount_percentage;
+  const unitDisplay = product.categories?.unit || 'g';
 
   const handleAddToCart = () => {
     for (let i = 0; i < quantity; i++) {
@@ -80,6 +96,30 @@ const ProductDetails: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-background pt-14 md:pt-20">
+      {/* Meta Tags */}
+      {product && (
+        <MetaTags
+          title={product.name}
+          description={product.description}
+          keywords={`${product.name}, ${product.categories?.name || 'grocery'}, online grocery, Puscart`}
+          ogImage={product.image}
+          structuredData={generateProductSchema({
+            name: product.name,
+            description: product.description,
+            image: product.image,
+            price: product.offer_price || product.price,
+            currency: 'INR',
+            availability: product.stock > 0 ? 'InStock' : 'OutOfStock',
+            category: product.categories?.name || 'Grocery',
+            brand: 'Puscart',
+            sku: product.id
+          })}
+        />
+      )}
+
+      {/* Breadcrumbs */}
+      <Breadcrumbs />
+
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {/* Back Button */}
         <Link to="/shop" className="inline-flex items-center space-x-2 text-gray-600 hover:text-primary-500 mb-6">
@@ -94,6 +134,12 @@ const ProductDetails: React.FC = () => {
               <img
                 src={product.image}
                 alt={product.name}
+                loading="eager"
+                fetchPriority="high"
+                decoding="async"
+                width="600"
+                height="400"
+                sizes="(max-width:768px) 100vw, 600px"
                 className="w-full h-96 object-cover rounded-xl"
               />
             </div>
@@ -102,13 +148,17 @@ const ProductDetails: React.FC = () => {
                 <button
                   key={index}
                   onClick={() => setSelectedImage(index)}
-                  className={`bg-white rounded-lg p-2 border-2 transition-colors ${
-                    selectedImage === index ? 'border-primary-500' : 'border-gray-200'
-                  }`}
+                  className={`bg-white rounded-lg p-2 border-2 transition-colors ${selectedImage === index ? 'border-primary-500' : 'border-gray-200'
+                    }`}
                 >
                   <img
                     src={image}
-                    alt={`${product.name} ${index + 1}`}
+                    alt={`${product.name} thumbnail ${index + 1}`}
+                    loading="lazy"
+                    decoding="async"
+                    width="100"
+                    height="80"
+                    sizes="100px"
                     className="w-full h-20 object-cover rounded"
                   />
                 </button>
@@ -131,32 +181,19 @@ const ProductDetails: React.FC = () => {
                 {product.name}
               </h1>
 
-              {/* Rating */}
-              <div className="flex items-center mb-4">
-                <div className="flex items-center">
-                  {[...Array(5)].map((_, i) => (
-                    <Star
-                      key={i}
-                      className={`w-5 h-5 ${
-                        i < 4 ? 'text-yellow-400 fill-current' : 'text-gray-300'
-                      }`}
-                    />
-                  ))}
-                </div>
-                <span className="text-gray-600 ml-2">(4.0) 128 reviews</span>
-              </div>
+
 
               {/* Price */}
               <div className="flex items-center space-x-3 mb-6">
                 <span className="text-3xl font-bold text-primary-600">
-                  ₹{currentPrice}
+                  ₹{currentPrice} / {unitDisplay}
                 </span>
                 {hasDiscount && (
                   <span className="text-xl text-gray-400 line-through">
-                    ₹{product.price}
+                    ₹{product.price} / {unitDisplay}
                   </span>
                 )}
-                                <span className="text-gray-600">{product.categories?.name || 'Uncategorized'}</span>
+                <span className="text-gray-600">{product.categories?.name || 'Uncategorized'}</span>
               </div>
 
               {/* Description */}
@@ -166,12 +203,10 @@ const ProductDetails: React.FC = () => {
 
               {/* Stock Info */}
               <div className="flex items-center space-x-4 mb-6">
-                <div className={`flex items-center space-x-2 ${
-                  product.stock > 0 ? 'text-green-600' : 'text-red-600'
-                }`}>
-                  <div className={`w-2 h-2 rounded-full ${
-                    product.stock > 0 ? 'bg-green-600' : 'bg-red-600'
-                  }`} />
+                <div className={`flex items-center space-x-2 ${product.stock > 0 ? 'text-green-600' : 'text-red-600'
+                  }`}>
+                  <div className={`w-2 h-2 rounded-full ${product.stock > 0 ? 'bg-green-600' : 'bg-red-600'
+                    }`} />
                   <span className="text-sm font-medium">
                     {product.stock > 0 ? `In Stock (${product.stock} available)` : 'Out of Stock'}
                   </span>
@@ -184,6 +219,7 @@ const ProductDetails: React.FC = () => {
                 <div className="flex items-center space-x-2">
                   <button
                     onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                    aria-label="Decrease quantity"
                     className="p-2 rounded-lg border border-gray-300 hover:bg-gray-50"
                   >
                     <Minus className="w-4 h-4" />
@@ -194,9 +230,11 @@ const ProductDetails: React.FC = () => {
                     onChange={(e) => setQuantity(Math.max(1, Number(e.target.value)))}
                     className="w-16 text-center border border-gray-300 rounded-lg py-2"
                     min="1"
+                    aria-label="Quantity"
                   />
                   <button
                     onClick={() => setQuantity(quantity + 1)}
+                    aria-label="Increase quantity"
                     className="p-2 rounded-lg border border-gray-300 hover:bg-gray-50"
                   >
                     <Plus className="w-4 h-4" />
@@ -208,11 +246,10 @@ const ProductDetails: React.FC = () => {
               <button
                 onClick={handleAddToCart}
                 disabled={product.stock === 0}
-                className={`w-full py-3 px-6 rounded-xl font-medium transition-all duration-200 ${
-                  product.stock > 0
-                    ? 'btn-primary'
-                    : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                }`}
+                className={`w-full py-3 px-6 rounded-xl font-medium transition-all duration-200 ${product.stock > 0
+                  ? 'btn-primary'
+                  : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                  }`}
               >
                 {product.stock > 0 ? 'Add to Cart' : 'Out of Stock'}
               </button>

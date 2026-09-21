@@ -86,7 +86,7 @@ const AdminProducts: React.FC = () => {
       if (error) throw error
       setProducts(data || [])
     } catch (error) {
-      console.error('Error fetching products:', error)
+      // Error fetching products
     } finally {
       setLoading(false)
     }
@@ -103,7 +103,7 @@ const AdminProducts: React.FC = () => {
       if (error) throw error
       setCategories(data || [])
     } catch (error) {
-      console.error('Error fetching categories:', error)
+      // Error fetching categories
     }
   }
 
@@ -114,7 +114,7 @@ const AdminProducts: React.FC = () => {
   const handleImageUpload = async (file: File): Promise<string> => {
     const fileExt = file.name.split('.').pop()
     const fileName = `${Date.now()}.${fileExt}`
-    
+
     const { error: uploadError } = await supabase.storage
       .from('products')
       .upload(fileName, file)
@@ -172,7 +172,7 @@ const AdminProducts: React.FC = () => {
       setShowModal(false)
       resetForm()
     } catch (error) {
-      console.error('Error saving product:', error)
+      // Error saving product
     } finally {
       setSubmitting(false)
     }
@@ -209,7 +209,7 @@ const AdminProducts: React.FC = () => {
       if (error) throw error
       await fetchProducts()
     } catch (error) {
-      console.error('Error deleting product:', error)
+      // Error deleting product
     }
   }
 
@@ -246,7 +246,7 @@ const AdminProducts: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 flex pt-14 md:pt-20 overflow-x-hidden">
+    <div className="min-h-screen bg-gray-100 flex overflow-x-hidden pt-14 md:pt-0">
       <AdminSidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
 
       {/* Main content */}
@@ -342,7 +342,10 @@ const AdminProducts: React.FC = () => {
                       <img
                         src={product.image}
                         alt={product.name}
-                        className="h-12 w-12 rounded object-cover"
+                        loading="lazy"
+                        width="48"
+                        height="48"
+                        className="w-12 h-12 rounded-lg object-cover"
                       />
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
@@ -361,11 +364,10 @@ const AdminProducts: React.FC = () => {
                       {product.stock}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                        product.is_active
-                          ? 'bg-green-100 text-green-800'
-                          : 'bg-red-100 text-red-800'
-                      }`}>
+                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${product.is_active
+                        ? 'bg-green-100 text-green-800'
+                        : 'bg-red-100 text-red-800'
+                        }`}>
                         {product.is_active ? 'Active' : 'Inactive'}
                       </span>
                     </td>
@@ -402,13 +404,13 @@ const AdminProducts: React.FC = () => {
         {showModal && (
           <div className="fixed inset-0 z-50 overflow-y-auto">
             <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-18">
-              <div 
-                className="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75" 
+              <div
+                className="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75"
                 aria-hidden="true"
                 onClick={() => setShowModal(false)}
               />
 
-              <div 
+              <div
                 className="inline-block align-bottom bg-white rounded-2xl text-left overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full lg:max-w-5xl relative z-10 mx-4 sm:mx-auto"
                 onClick={(e) => e.stopPropagation()}
               >
@@ -428,7 +430,7 @@ const AdminProducts: React.FC = () => {
                         </svg>
                       </button>
                     </div>
-                    
+
                     <div className="space-y-6">
                       {/* Basic Information Section */}
                       <div>
@@ -542,7 +544,10 @@ const AdminProducts: React.FC = () => {
                             <img
                               src={formData.image}
                               alt="Product preview"
-                              className="h-24 w-24 rounded-xl object-cover shadow-md"
+                              loading="lazy"
+                              width="128"
+                              height="128"
+                              className="h-32 w-32 rounded-xl object-cover shadow-md"
                             />
                           </div>
                         )}
@@ -641,9 +646,9 @@ const AdminProducts: React.FC = () => {
             </div>
           </div>
         )}
-        </div>
       </div>
-    
+    </div>
+
   )
 }
 

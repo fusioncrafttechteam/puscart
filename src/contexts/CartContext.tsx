@@ -22,7 +22,7 @@ const loadCartFromStorage = (): CartState => {
       return JSON.parse(savedCart);
     }
   } catch (error) {
-    console.error('Error loading cart from localStorage:', error);
+    // Error loading cart from localStorage
   }
   return {
     items: [],
@@ -70,7 +70,11 @@ const cartReducer = (state: CartState, action: CartAction): CartState => {
     }
     
     case 'CLEAR_CART':
-      return initialState;
+      return {
+        items: [],
+        total: 0,
+        itemCount: 0,
+      };
     
     default:
       return state;
@@ -105,7 +109,7 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     try {
       localStorage.setItem('puscart_cart', JSON.stringify(state));
     } catch (error) {
-      console.error('Error saving cart to localStorage:', error);
+      // Error saving cart to localStorage
     }
   }, [state]);
 
@@ -123,6 +127,12 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const clearCart = () => {
     dispatch({ type: 'CLEAR_CART' });
+    // Also clear localStorage
+    try {
+      localStorage.removeItem('puscart_cart');
+    } catch (error) {
+      // Error clearing cart from localStorage
+    }
   };
 
   return (

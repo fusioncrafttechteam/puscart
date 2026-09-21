@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Debug Razorpay Function</title>
+</head>
+<body>
+    <h1>Debug Razorpay Edge Function</h1>
+    <button onclick="testWithoutAuth()">Test Without Auth</button>
+    <button onclick="testWithAuth()">Test With Auth</button>
+    <button onclick="testDirectCall()">Test Direct Call</button>
+    <div id="result"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script>
+        const supabaseUrl = 'https://tjgklvdmuxnlydwwchso.supabase.co'
+        const supabaseAnonKey = 'sb_publishable_faL1nLybWD8uw9uN3K39Cw_VubwRYfz'
+        const supabase = createClient(supabaseUrl, supabaseAnonKey)
+
+        async function testWithoutAuth() {
+            const resultDiv = document.getElementById('result')
+            resultDiv.innerHTML = 'Testing without auth...'
+
+            try {
+                const response = await fetch('https://tjgklvdmuxnlydwwchso.supabase.co/functions/v1/razorpay-order', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        amount: 100,
+                        currency: 'INR',
+                        receipt: 'test_receipt_' + Date.now()
+                    })
+                })
+
+                const text = await response.text()
+                console.log('Without auth response:', response.status, text)
+                
+                resultDiv.innerHTML = `
+                    <div style="color: ${response.ok ? 'green' : 'red'};">
+                        <h3>Without Auth - Status: ${response.status}</h3>
+                        <pre>${text}</pre>
+                    </div>
+                `
+            } catch (error) {
+                console.error('Without auth error:', error)
+                resultDiv.innerHTML = `<div style="color: red;">Exception: ${error.message}</div>`
+            }
+        }
+
+        async function testWithAuth() {
+            const resultDiv = document.getElementById('result')
+            resultDiv.innerHTML = 'Testing with auth...'
+
+            try {
+                // First get session
+                const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+                console.log('Session:', session, sessionError)
+
+                if (!session) {
+                    resultDiv.innerHTML = '<div style="color: orange;">No session found - please login first</div>'
+                    return
+                }
+
+                const response = await fetch('https://tjgklvdmuxnlydwwchso.supabase.co/functions/v1/razorpay-order', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${session.access_token}`
+                    },
+                    body: JSON.stringify({
+                        amount: 100,
+                        currency: 'INR',
+                        receipt: 'test_receipt_' + Date.now()
+                    })
+                })
+
+                const text = await response.text()
+                console.log('With auth response:', response.status, text)
+                
+                resultDiv.innerHTML = `
+                    <div style="color: ${response.ok ? 'green' : 'red'};">
+                        <h3>With Auth - Status: ${response.status}</h3>
+                        <pre>${text}</pre>
+                    </div>
+                `
+            } catch (error) {
+                console.error('With auth error:', error)
+                resultDiv.innerHTML = `<div style="color: red;">Exception: ${error.message}</div>`
+            }
+        }
+
+        async function testDirectCall() {
+            const resultDiv = document.getElementById('result')
+            resultDiv.innerHTML = 'Testing direct Supabase call...'
+
+            try {
+                const { data, error } = await supabase.functions.invoke('razorpay-order', {
+                    body: {
+                        amount: 100,
+                        currency: 'INR',
+                        receipt: 'test_receipt_' + Date.now()
+                    }
+                })
+
+                console.log('Direct call result:', { data, error })
+                
+                resultDiv.innerHTML = `
+                    <div style="color: ${error ? 'red' : 'green'};">
+                        <h3>Direct Call Result</h3>
+                        <pre>Data: ${JSON.stringify(data, null, 2)}</pre>
+                        <pre>Error: ${JSON.stringify(error, null, 2)}</pre>
+                    </div>
+                `
+            } catch (error) {
+                console.error('Direct call error:', error)
+                resultDiv.innerHTML = `<div style="color: red;">Exception: ${error.message}</div>`
+            }
+        }
+    </script>
+</body>
+</html>

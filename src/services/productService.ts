@@ -155,7 +155,6 @@ export const getOfferBanners = async () => {
     .order("created_at", { ascending: false })
 
   if (error) {
-    console.error('Error fetching offer banners:', error)
     return []
   }
 

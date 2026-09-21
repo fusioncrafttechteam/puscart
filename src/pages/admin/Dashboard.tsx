@@ -1,28 +1,25 @@
-import React, { useState, useEffect } from 'react'
-import { Link, useLocation } from 'react-router-dom'
-import { useAuth } from '../../contexts/AuthContext'
+import React, { useState, useEffect, lazy, Suspense } from 'react'
+
+
 import { supabase } from '../../services/supabase'
 import {
-  ChartBarIcon,
   ShoppingBagIcon,
-  UsersIcon,
+  ChartBarIcon,
   ClipboardDocumentListIcon,
-  TagIcon,
-  PhotoIcon,
-  ArrowRightOnRectangleIcon,
-  HomeIcon
+  UsersIcon
 } from '@heroicons/react/24/outline'
-import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  BarChart,
-  Bar
-} from 'recharts'
+import AdminSidebar from '../../components/AdminSidebar'
+
+// Lazy load chart components for better performance
+const LineChart = lazy(() => import('recharts').then(module => ({ default: module.LineChart })))
+const Line = lazy(() => import('recharts').then(module => ({ default: module.Line })))
+const BarChart = lazy(() => import('recharts').then(module => ({ default: module.BarChart })))
+const Bar = lazy(() => import('recharts').then(module => ({ default: module.Bar })))
+const XAxis = lazy(() => import('recharts').then(module => ({ default: module.XAxis })))
+const YAxis = lazy(() => import('recharts').then(module => ({ default: module.YAxis })))
+const CartesianGrid = lazy(() => import('recharts').then(module => ({ default: module.CartesianGrid })))
+const Tooltip = lazy(() => import('recharts').then(module => ({ default: module.Tooltip })))
+const ResponsiveContainer = lazy(() => import('recharts').then(module => ({ default: module.ResponsiveContainer })))
 
 interface DashboardStats {
   totalProducts: number
@@ -39,8 +36,7 @@ interface ChartData {
 }
 
 const AdminDashboard: React.FC = () => {
-  const { signOut } = useAuth()
-  const location = useLocation()
+
   const [stats, setStats] = useState<DashboardStats>({
     totalProducts: 0,
     totalRevenue: 0,
@@ -51,14 +47,7 @@ const AdminDashboard: React.FC = () => {
   const [loading, setLoading] = useState(true)
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
-  const navigation = [
-    { name: 'Dashboard', href: '/admin', icon: HomeIcon },
-    { name: 'Products', href: '/admin/products', icon: ShoppingBagIcon },
-    { name: 'Categories', href: '/admin/categories', icon: TagIcon },
-    { name: 'Offer Banners', href: '/admin/banners', icon: PhotoIcon },
-    { name: 'Orders', href: '/admin/orders', icon: ClipboardDocumentListIcon },
-    { name: 'Users', href: '/admin/users', icon: UsersIcon },
-  ]
+
 
   useEffect(() => {
     fetchDashboardData()
@@ -66,11 +55,11 @@ const AdminDashboard: React.FC = () => {
     // Set up realtime subscriptions
     const ordersSubscription = supabase
       .channel('orders-changes')
-      .on('postgres_changes', 
-        { 
-          event: '*', 
-          schema: 'public', 
-          table: 'orders' 
+      .on('postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'orders'
         },
         () => {
           fetchDashboardData()
@@ -80,11 +69,11 @@ const AdminDashboard: React.FC = () => {
 
     const productsSubscription = supabase
       .channel('products-changes')
-      .on('postgres_changes', 
-        { 
-          event: '*', 
-          schema: 'public', 
-          table: 'products' 
+      .on('postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'products'
         },
         () => {
           fetchDashboardData()
@@ -94,11 +83,11 @@ const AdminDashboard: React.FC = () => {
 
     const usersSubscription = supabase
       .channel('users-changes')
-      .on('postgres_changes', 
-        { 
-          event: '*', 
-          schema: 'public', 
-          table: 'users' 
+      .on('postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'users'
         },
         () => {
           fetchDashboardData()
@@ -154,7 +143,7 @@ const AdminDashboard: React.FC = () => {
       setChartData(monthlyStats)
 
     } catch (error) {
-      console.error('Error fetching dashboard data:', error)
+      // Error fetching dashboard data
     } finally {
       setLoading(false)
     }
@@ -162,9 +151,9 @@ const AdminDashboard: React.FC = () => {
 
   const processMonthlyData = (orders: any[]): ChartData[] => {
     const monthlyMap = new Map<string, { revenue: number; orders: number }>()
-    
+
     const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-    
+
     // Initialize last 6 months
     const now = new Date()
     for (let i = 5; i >= 0; i--) {
@@ -193,9 +182,7 @@ const AdminDashboard: React.FC = () => {
     }))
   }
 
-  const handleSignOut = async () => {
-    await signOut()
-  }
+
 
   if (loading) {
     return (
@@ -206,55 +193,13 @@ const AdminDashboard: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 flex pt-14 md:pt-20 overflow-x-hidden">
+    <div className="min-h-screen bg-gray-100 flex pt-14 md:pt-0 overflow-x-hidden">
       {/* Sidebar */}
-      <div className={`${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-lg transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0`}>
-        <div className="flex items-center justify-between h-16 px-4 border-b">
-          <h1 className="text-xl font-bold text-gray-900">Admin Dashboard</h1>
-          <button
-            onClick={() => setSidebarOpen(false)}
-            className="lg:hidden"
-          >
-            <span className="sr-only">Close sidebar</span>
-            <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-        
-        <nav className="mt-8">
-          <div className="px-4 space-y-2">
-            {navigation.map((item) => (
-              <Link
-                key={item.name}
-                to={item.href}
-                className={`group flex items-center px-3 py-2 text-sm font-medium rounded-md ${
-                  location.pathname === item.href
-                    ? 'bg-blue-50 text-blue-700 border-r-2 border-blue-700'
-                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                }`}
-              >
-                <item.icon className="mr-3 h-5 w-5" />
-                {item.name}
-              </Link>
-            ))}
-          </div>
-          
-          <div className="mt-8 px-4">
-            <button
-              onClick={handleSignOut}
-              className="group flex items-center px-3 py-2 text-sm font-medium rounded-md text-gray-600 hover:bg-gray-50 hover:text-gray-900 w-full"
-            >
-              <ArrowRightOnRectangleIcon className="mr-3 h-5 w-5" />
-              Logout
-            </button>
-          </div>
-        </nav>
-      </div>
+      <AdminSidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
 
       {/* Main content */}
       <div className="flex-1 w-full max-w-full overflow-x-hidden">
-               
+
         {/* Dashboard content */}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-8">
           <div className="mb-8">
@@ -347,29 +292,31 @@ const AdminDashboard: React.FC = () => {
                     <ChartBarIcon className="h-4 w-4 text-blue-600" />
                   </div>
                 </div>
-                <ResponsiveContainer width="100%" height={300}>
-                  <LineChart data={chartData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                    <XAxis dataKey="month" tick={{ fill: '#6b7280', fontSize: 12 }} />
-                    <YAxis tick={{ fill: '#6b7280', fontSize: 12 }} />
-                    <Tooltip 
-                      formatter={(value) => [`₹${value}`, 'Revenue']}
-                      contentStyle={{ 
-                        backgroundColor: '#ffffff', 
-                        border: '1px solid #e5e7eb',
-                        borderRadius: '8px'
-                      }}
-                    />
-                    <Line 
-                      type="monotone" 
-                      dataKey="revenue" 
-                      stroke="#3B82F6" 
-                      strokeWidth={2}
-                      dot={{ fill: '#3B82F6', r: 4 }}
-                      activeDot={{ r: 6 }}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
+                <Suspense fallback={<div className="h-300 flex items-center justify-center text-gray-500">Loading chart...</div>}>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <LineChart data={chartData}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                      <XAxis dataKey="month" tick={{ fill: '#6b7280', fontSize: 12 }} />
+                      <YAxis tick={{ fill: '#6b7280', fontSize: 12 }} />
+                      <Tooltip
+                        formatter={(value) => [`₹${value}`, 'Revenue']}
+                        contentStyle={{
+                          backgroundColor: '#ffffff',
+                          border: '1px solid #e5e7eb',
+                          borderRadius: '8px'
+                        }}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="revenue"
+                        stroke="#3B82F6"
+                        strokeWidth={2}
+                        dot={{ fill: '#3B82F6', r: 4 }}
+                        activeDot={{ r: 6 }}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </Suspense>
               </div>
             </div>
 
@@ -381,22 +328,24 @@ const AdminDashboard: React.FC = () => {
                     <ClipboardDocumentListIcon className="h-4 w-4 text-green-600" />
                   </div>
                 </div>
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={chartData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                    <XAxis dataKey="month" tick={{ fill: '#6b7280', fontSize: 12 }} />
-                    <YAxis tick={{ fill: '#6b7280', fontSize: 12 }} />
-                    <Tooltip 
-                      formatter={(value) => [value, 'Orders']}
-                      contentStyle={{ 
-                        backgroundColor: '#ffffff', 
-                        border: '1px solid #e5e7eb',
-                        borderRadius: '8px'
-                      }}
-                    />
-                    <Bar dataKey="orders" fill="#10B981" radius={[8, 8, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
+                <Suspense fallback={<div className="h-300 flex items-center justify-center text-gray-500">Loading chart...</div>}>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <BarChart data={chartData}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                      <XAxis dataKey="month" tick={{ fill: '#6b7280', fontSize: 12 }} />
+                      <YAxis tick={{ fill: '#6b7280', fontSize: 12 }} />
+                      <Tooltip
+                        formatter={(value) => [value, 'Orders']}
+                        contentStyle={{
+                          backgroundColor: '#ffffff',
+                          border: '1px solid #e5e7eb',
+                          borderRadius: '8px'
+                        }}
+                      />
+                      <Bar dataKey="orders" fill="#10B981" radius={[8, 8, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </Suspense>
               </div>
             </div>
           </div>
@@ -404,12 +353,7 @@ const AdminDashboard: React.FC = () => {
       </div>
 
       {/* Mobile sidebar overlay */}
-      {sidebarOpen && (
-        <div 
-          className="fixed inset-0 z-40 bg-gray-600 bg-opacity-75 lg:hidden"
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
+
     </div>
   )
 }

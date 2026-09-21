@@ -28,6 +28,7 @@ export interface ProductWithCategory {
   categories: {
     id: string;
     name: string;
+    unit: string;
   };
 }
 
@@ -37,6 +38,7 @@ export interface Category {
   image: string;
   description?: string;
   display_order: number;
+  unit: string;
 }
 
 export interface CartItem {

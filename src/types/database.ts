@@ -43,6 +43,7 @@ export interface Database {
           description: string
           image: string
           is_active: boolean
+          display_order: number
           created_at: string
           updated_at: string
         }
@@ -52,6 +53,7 @@ export interface Database {
           description: string
           image: string
           is_active?: boolean
+          display_order?: number
           created_at?: string
           updated_at?: string
         }
@@ -61,6 +63,7 @@ export interface Database {
           description?: string
           image?: string
           is_active?: boolean
+          display_order?: number
           created_at?: string
           updated_at?: string
         }
@@ -76,6 +79,9 @@ export interface Database {
           stock: number
           image: string
           is_active: boolean
+          popular: boolean
+          featured: boolean
+          best_selling: boolean
           created_at: string
           updated_at: string
         }
@@ -89,6 +95,9 @@ export interface Database {
           stock: number
           image: string
           is_active?: boolean
+          popular?: boolean
+          featured?: boolean
+          best_selling?: boolean
           created_at?: string
           updated_at?: string
         }
@@ -102,6 +111,9 @@ export interface Database {
           stock?: number
           image?: string
           is_active?: boolean
+          popular?: boolean
+          featured?: boolean
+          best_selling?: boolean
           created_at?: string
           updated_at?: string
         }
@@ -115,6 +127,8 @@ export interface Database {
           delivery_status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled'
           delivery_address: string
           phone: string
+          delivery_address_id?: string
+          products: ProductItem[]
           created_at: string
           updated_at: string
         }
@@ -126,6 +140,8 @@ export interface Database {
           delivery_status?: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled'
           delivery_address: string
           phone: string
+          delivery_address_id?: string
+          products: ProductItem[]
           created_at?: string
           updated_at?: string
         }
@@ -137,34 +153,10 @@ export interface Database {
           delivery_status?: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled'
           delivery_address?: string
           phone?: string
+          delivery_address_id?: string
+          products?: ProductItem[]
           created_at?: string
           updated_at?: string
-        }
-      }
-      order_items: {
-        Row: {
-          id: string
-          order_id: string
-          product_id: string
-          quantity: number
-          price: number
-          created_at: string
-        }
-        Insert: {
-          id?: string
-          order_id: string
-          product_id: string
-          quantity: number
-          price: number
-          created_at?: string
-        }
-        Update: {
-          id?: string
-          order_id?: string
-          product_id?: string
-          quantity?: number
-          price?: number
-          created_at?: string
         }
       }
       cart_items: {
@@ -199,6 +191,8 @@ export interface Database {
           title: string
           description: string
           image: string
+          discount: string
+          code: string
           is_active: boolean
           start_date: string
           end_date: string
@@ -210,9 +204,11 @@ export interface Database {
           title: string
           description: string
           image: string
+          discount?: string
+          code?: string
           is_active?: boolean
-          start_date: string
-          end_date: string
+          start_date?: string
+          end_date?: string
           created_at?: string
           updated_at?: string
         }
@@ -221,6 +217,8 @@ export interface Database {
           title?: string
           description?: string
           image?: string
+          discount?: string
+          code?: string
           is_active?: boolean
           start_date?: string
           end_date?: string
@@ -232,10 +230,22 @@ export interface Database {
   }
 }
 
+export interface ProductItem {
+  id: string
+  product_id: string
+  quantity: number
+  price: number
+  created_at: string
+  products?: {
+    id: string
+    name: string
+    image: string
+  }
+}
+
 export type User = Database['public']['Tables']['users']['Row']
 export type Category = Database['public']['Tables']['categories']['Row']
 export type Product = Database['public']['Tables']['products']['Row']
 export type Order = Database['public']['Tables']['orders']['Row']
-export type OrderItem = Database['public']['Tables']['order_items']['Row']
 export type CartItem = Database['public']['Tables']['cart_items']['Row']
 export type OfferBanner = Database['public']['Tables']['offer_banners']['Row']

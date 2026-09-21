@@ -6,13 +6,15 @@ import ProductCard from '../components/ProductCard';
 import SearchBar from '../components/SearchBar';
 import Footer from '../components/Footer';
 import SkeletonLoader from '../components/SkeletonLoader';
+import MetaTags from '../components/MetaTags';
+import Breadcrumbs from '../components/Breadcrumbs';
 import type { ProductWithCategory, Category } from '../types';
 
 const Shop: React.FC = () => {
   const [searchParams] = useSearchParams();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
-  const [priceRange, setPriceRange] = useState({ min: 0, max: 500 });
+  const [priceRange, setPriceRange] = useState({ min: 0, max: 2000 });
   const [showFilters, setShowFilters] = useState(false);
   const [products, setProducts] = useState<ProductWithCategory[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -21,7 +23,9 @@ const Shop: React.FC = () => {
 
   useEffect(() => {
     const category = searchParams.get('category') || '';
+    const search = searchParams.get('search') || '';
     setSelectedCategory(category);
+    setSearchQuery(search);
   }, [searchParams]);
 
   useEffect(() => {
@@ -35,7 +39,7 @@ const Shop: React.FC = () => {
       const data = await getProducts();
       setProducts(data);
     } catch (error) {
-      console.error('Error fetching products:', error);
+      // Error fetching products
     } finally {
       setLoading(false);
     }
@@ -46,7 +50,7 @@ const Shop: React.FC = () => {
       const data = await getCategories();
       setCategories(data);
     } catch (error) {
-      console.error('Error fetching categories:', error);
+      // Error fetching categories
     }
   };
 
@@ -81,13 +85,13 @@ const Shop: React.FC = () => {
   const clearFilters = () => {
     setSearchQuery('');
     setSelectedCategory('');
-    setPriceRange({ min: 0, max: 500 });
+    setPriceRange({ min: 0, max: 2000 });
   };
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background pt-20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <div className="min-h-screen bg-background pt-14 md:pt-20">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 md:py-6">
           <div className="mb-6">
             <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-4">Shop</h1>
             <SkeletonLoader />
@@ -98,8 +102,14 @@ const Shop: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background pt-14 md:pt-20">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+    <div className="min-h-screen bg-background pt-14 md:pt-10">
+      <MetaTags
+        title="Shop - Puscart Online Grocery"
+        description="Browse our wide selection of fresh groceries, vegetables, fruits, dairy products and more. Get quality products delivered to your doorstep."
+        keywords="shop, online grocery, fresh vegetables, fruits, dairy, Puscart"
+      />
+      <Breadcrumbs />
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 md:py-6">
         {/* Header */}
         <div className="mb-6">
           <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-4">Shop</h1>
@@ -118,6 +128,7 @@ const Shop: React.FC = () => {
                 <h2 className="font-semibold text-gray-900">Filters</h2>
                 <button
                   onClick={clearFilters}
+                  aria-label="Clear all filters"
                   className="text-sm text-primary-500 hover:text-primary-600"
                 >
                   Clear All
@@ -196,6 +207,7 @@ const Shop: React.FC = () => {
                       ? 'bg-blue-500 text-white'
                       : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                   }`}
+                  aria-label="Show all categories"
                 >
                   All
                 </button>
@@ -208,6 +220,7 @@ const Shop: React.FC = () => {
                         ? 'bg-blue-500 text-white'
                         : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                     }`}
+                    aria-label={`Filter by ${category.name} category`}
                   >
                     {category.name}
                   </button>
@@ -256,6 +269,7 @@ const Shop: React.FC = () => {
                   <h2 className="font-semibold text-gray-900">Filters</h2>
                   <button
                     onClick={() => setShowFilters(false)}
+                    aria-label="Close filters"
                     className="p-2 rounded-lg hover:bg-gray-100"
                   >
                     <X className="w-5 h-5" />

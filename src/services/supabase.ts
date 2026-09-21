@@ -11,7 +11,9 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     persistSession: true,
     autoRefreshToken: true,
-    detectSessionInUrl: true
+    detectSessionInUrl: true,
+    flowType: 'pkce',
+    debug: false
   }
 })
 
@@ -21,6 +23,5 @@ export type {
   Category, 
   Product, 
   Order, 
-  OrderItem, 
   OfferBanner 
 } from '../types/database'

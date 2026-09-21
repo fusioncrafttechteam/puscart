@@ -36,7 +36,7 @@ const MobileNavbar: React.FC<MobileNavbarProps> = ({ isAuthenticated, isAdmin = 
   const regularMenuItems = [
     { name: 'Home', path: '/' },
     { name: 'Shop', path: '/shop' },
-    
+
     { name: 'Profile', path: '/profile' },
     { name: 'About', path: '/about' },
     { name: 'Contact', path: '/contact' },
@@ -52,7 +52,6 @@ const MobileNavbar: React.FC<MobileNavbarProps> = ({ isAuthenticated, isAdmin = 
         await signOut();
         navigate('/');
       } catch (error) {
-        console.error('Logout failed:', error);
         // Still navigate even if logout fails
         navigate('/');
       }
@@ -69,17 +68,23 @@ const MobileNavbar: React.FC<MobileNavbarProps> = ({ isAuthenticated, isAdmin = 
         <div className="flex items-center justify-between h-14 px-4 sm:px-6 lg:px-8">
           {/* Logo - Left */}
           <Link to="/" className="flex items-center">
-            <img 
-              src={logo} 
-              alt="Puscart Logo" 
+            <img
+              src={logo}
+              alt="Puscart Logo"
+              width="32"
+              height="32"
+              loading="eager"
+              fetchPriority="high"
+              decoding="async"
               className="w-8 h-8 object-contain"
             />
           </Link>
 
-          
+
           {/* Hamburger Menu - Right */}
           <button
             onClick={() => setIsMenuOpen(!isMenuOpen)}
+            aria-label={isMenuOpen ? "Close menu" : "Open menu"}
             className="p-2 rounded-lg hover:bg-white/20 transition-colors"
           >
             {isMenuOpen ? (
@@ -105,25 +110,25 @@ const MobileNavbar: React.FC<MobileNavbarProps> = ({ isAuthenticated, isAdmin = 
                 </h2>
                 <button
                   onClick={() => setIsMenuOpen(false)}
+                  aria-label="Close menu"
                   className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
                 >
                   <X className="w-5 h-5 text-gray-700" />
                 </button>
               </div>
             </div>
-            
+
             <div className="py-2">
               {menuItems.map((item) => (
                 <button
                   key={item.name}
                   onClick={() => handleMenuClick(item.path)}
-                  className={`block w-full text-left px-4 py-3 transition-colors ${
-                    isAdminRoute 
-                      ? 'text-blue-700 hover:bg-blue-50 font-medium' 
-                      : item.name === 'Admin' 
-                        ? 'text-purple-700 hover:bg-purple-50 font-medium' 
+                  className={`block w-full text-left px-4 py-3 transition-colors ${isAdminRoute
+                      ? 'text-blue-700 hover:bg-blue-50 font-medium'
+                      : item.name === 'Admin'
+                        ? 'text-purple-700 hover:bg-purple-50 font-medium'
                         : 'text-gray-700 hover:bg-gray-100'
-                  }`}
+                    }`}
                 >
                   <div className="flex items-center space-x-3">
                     {'icon' in item && item.icon ? <item.icon className="w-4 h-4" /> : null}

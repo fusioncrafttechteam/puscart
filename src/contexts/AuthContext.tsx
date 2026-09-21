@@ -53,7 +53,7 @@ const loadProfileFromStorage = (userId: string): AppUser | null => {
       return JSON.parse(savedProfile);
     }
   } catch (error) {
-    console.error('Error loading profile from localStorage:', error);
+    // Error loading profile from localStorage
   }
   return null;
 };
@@ -73,6 +73,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const { data: { session }, error } = await supabase.auth.getSession()
         
         if (error) {
+          // If refresh token is invalid, clear local storage and start fresh
+          if (error.message?.includes('Refresh Token Not Found') || error.message?.includes('Invalid Refresh Token')) {
+            await supabase.auth.signOut({ scope: 'global' })
+            localStorage.clear()
+            sessionStorage.clear()
+          }
           setLoading(false)
           return
         }
@@ -90,6 +96,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setLoading(false)
         }
       } catch (error) {
+        // Get initial session error
         setLoading(false)
       }
     }
@@ -198,7 +205,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       try {
         localStorage.setItem(`puscart_profile_${userId}`, JSON.stringify(profileData));
       } catch (error) {
-        console.error('Error saving profile to localStorage:', error);
+        // Error saving profile to localStorage
       }
       setAppUser(profileData);
     } catch (error) {
@@ -220,8 +227,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signUp = async (email: string, password: string, name: string, phone: string) => {
     try {
-      console.log("Starting signup process for:", email)
-      
       // Create auth user with correct options format
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
@@ -235,15 +240,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       })
 
       if (authError) {
-        console.error("Auth signup error:", authError.message, authError)
         return { error: authError }
       }
 
-      console.log("Auth signup successful:", authData)
-
+      
       if (authData.user) {
-        console.log("User created in auth.users, checking if profile exists...")
-        
         // Wait a moment for the trigger to create the profile
         await new Promise(resolve => setTimeout(resolve, 1000))
         
@@ -255,12 +256,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           .single()
 
         if (fetchError && fetchError.code !== 'PGRST116') {
-          console.error("Error fetching profile:", fetchError)
-          // Don't return error yet, try to create manually
+          // Error fetching profile - try to create manually
         }
 
         if (!existingProfile) {
-          console.log("Profile not found, creating manually...")
           // Create user profile manually if trigger didn't work
           const { error: profileError } = await supabase
             .from('users')
@@ -274,19 +273,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             })
 
           if (profileError) {
-            console.error("Manual profile creation error:", profileError.message, profileError)
             return { error: profileError }
           }
 
-          console.log("Profile created manually")
+          // Profile created manually
         } else {
-          console.log("Profile created automatically by trigger")
+          // Profile created automatically by trigger
         }
       }
 
       return { error: null }
     } catch (error) {
-      console.error("Unexpected signup error:", error)
       return { error }
     }
   }
@@ -312,16 +309,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signOut = async () => {
     try {
-      const { error } = await supabase.auth.signOut()
+      // Clear all local storage first
+      localStorage.clear()
+      sessionStorage.clear()
       
-      if (!error) {
-        // Clear all auth state manually
-        setUser(null)
-        setSession(null)
-        setAppUser(null)
+      // Then sign out from Supabase
+      const { error } = await supabase.auth.signOut({ scope: 'global' })
+      
+      // Clear all auth state manually
+      setUser(null)
+      setSession(null)
+      setAppUser(null)
+      setLoading(false)
+      
+      if (error) {
+        // Sign out error - continue with cleanup
       }
     } catch (error) {
-      // Silently handle sign out errors
+      // Unexpected sign out error - continue with cleanup
+      // Still clear state even if sign out fails
+      setUser(null)
+      setSession(null)
+      setAppUser(null)
+      setLoading(false)
     }
   }
 

@@ -2,52 +2,110 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/jpeg" href="/src/assets/Puscart logo.jpeg" />
+    <link rel="icon" type="image/jpeg" href="/Puscart logo.jpeg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     
-    <!-- Security Headers -->
-    <meta http-equiv="X-Content-Type-Options" content="nosniff" />
-    <meta http-equiv="X-Frame-Options" content="DENY" />
-    <meta http-equiv="X-XSS-Protection" content="1; mode=block" />
-    <meta http-equiv="Referrer-Policy" content="strict-origin-when-cross-origin" />
+    <!-- Primary Meta Tags -->
+    <title>Puscart - Online Grocery Delivery Service | Fresh Groceries Delivered to Your Doorstep</title>
+    <meta name="title" content="Puscart - Online Grocery Delivery Service" />
+    <meta name="description" content="Order fresh groceries online with Puscart. Fast delivery, quality products, and great prices. Get fruits, vegetables, dairy, and more delivered to your doorstep in 30 minutes." />
+    <meta name="keywords" content="online grocery, grocery delivery, fresh vegetables, fruits, dairy products, food delivery, Puscart, Tamil Nadu grocery" />
+    <meta name="author" content="Puscart Delivery Service" />
+    <meta name="robots" content="index, follow" />
     
-    <!-- Content Security Policy -->
-    <meta http-equiv="Content-Security-Policy" content="
-      default-src 'self';
-      script-src 'self' 'unsafe-inline' https://checkout.razorpay.com;
-      style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
-      img-src 'self' data: https:;
-      connect-src 'self' https://api.razorpay.com https://tjgklvdmuxnlydwwchso.supabase.co https://*.supabase.co;
-      font-src 'self' https://fonts.gstatic.com;
-      object-src 'none';
-      base-uri 'self';
-      form-action 'self';
-      frame-ancestors 'none';
-      child-src 'self' https://checkout.razorpay.com;
-      upgrade-insecure-requests;
-    " />
+    <!-- Canonical URL -->
+    <link rel="canonical" href="https://puscart.com" />
     
-    <!-- Permissions Policy -->
-    <meta http-equiv="Permissions-Policy" content="
-      accelerometer=(),
-      camera=(),
-      gyroscope=(),
-      magnetometer=(),
-      microphone=(),
-      payment=(),
-      usb=(),
-      interest-cohort=()
-    " />
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://puscart.com" />
+    <meta property="og:title" content="Puscart - Online Grocery Delivery Service" />
+    <meta property="og:description" content="Order fresh groceries online with Puscart. Fast delivery, quality products, and great prices. Get fruits, vegetables, dairy, and more delivered to your doorstep." />
+    <meta property="og:image" content="https://puscart.com/Puscart logo.jpeg" />
+    <meta property="og:site_name" content="Puscart" />
+    <meta property="og:locale" content="en_IN" />
     
-    <title>Puscart Delivery Service</title>
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image" />
+    <meta property="twitter:url" content="https://puscart.com" />
+    <meta property="twitter:title" content="Puscart - Online Grocery Delivery Service" />
+    <meta property="twitter:description" content="Order fresh groceries online with Puscart. Fast delivery, quality products, and great prices." />
+    <meta property="twitter:image" content="https://puscart.com/Puscart logo.jpeg" />
     
-        
+    <!-- Apple Touch Icon -->
+    <link rel="apple-touch-icon" href="/Puscart logo.jpeg" />
+    
     <!-- Manifest -->
     <link rel="manifest" href="/manifest.json" />
+
+    <!-- Service Worker Cache Busting - Version 1.1.0 -->
+    <meta name="service-worker-version" content="v1.1.0" />
     
-    <!-- Theme -->
-    <meta name="theme-color" content="#00C4CC" />
-    <meta name="description" content="Fast and reliable grocery delivery service" />
+    <!-- Preconnect to external domains -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://tjgklvdmuxnlydwwchso.supabase.co" crossorigin />
+    
+    <!-- Structured Data - Organization -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Organization",
+      "name": "Puscart",
+      "url": "https://puscart.com",
+      "logo": "https://puscart.com/Puscart logo.jpeg",
+      "description": "Online grocery delivery service providing fresh groceries to your doorstep",
+      "address": {
+        "@type": "PostalAddress",
+        "streetAddress": "No.391, Thindivanam Main Road, Opp to India One ATM, Somasipadi Post",
+        "addressLocality": "Kilpennathur Taluk",
+        "addressRegion": "Thiruvannamalai",
+        "postalCode": "606611",
+        "addressCountry": "IN"
+      },
+      "contactPoint": {
+        "@type": "ContactPoint",
+        "telephone": "+91 9894122804",
+        "contactType": "customer service",
+        "email": "puscartdeliveryservice@gmail.com"
+      },
+      "sameAs": []
+    }
+    </script>
+    
+    <!-- Structured Data - Local Business -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "LocalBusiness",
+      "name": "Puscart",
+      "image": "https://puscart.com/Puscart logo.jpeg",
+      "telephone": "+91 9894122804",
+      "email": "puscartdeliveryservice@gmail.com",
+      "address": {
+        "@type": "PostalAddress",
+        "streetAddress": "No.391, Thindivanam Main Road, Opp to India One ATM, Somasipadi Post",
+        "addressLocality": "Kilpennathur Taluk",
+        "addressRegion": "Thiruvannamalai",
+        "postalCode": "606611",
+        "addressCountry": "IN"
+      },
+      "openingHoursSpecification": {
+        "@type": "OpeningHoursSpecification",
+        "dayOfWeek": [
+          "Monday",
+          "Tuesday",
+          "Wednesday",
+          "Thursday",
+          "Friday",
+          "Saturday",
+          "Sunday"
+        ],
+        "opens": "08:00",
+        "closes": "22:00"
+      },
+      "priceRange": "₹₹"
+    }
+    </script>
   </head>
   <body>
     <div id="root"></div>

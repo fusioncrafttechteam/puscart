@@ -48,7 +48,6 @@ const Contact: React.FC = () => {
         setSubmitMessage('Something went wrong. Please try again.');
       }
     } catch (error) {
-      console.error('EmailJS Error:', error);
       setSubmitMessage('Failed to send message. Please try again later.');
     } finally {
       setIsSubmitting(false);
@@ -56,10 +55,10 @@ const Contact: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background pt-20">
+    <div className="min-h-screen bg-background pt-10">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-6">Contact Us</h1>
-        
+
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
           {/* Contact Form */}
           <div className="bg-white rounded-2xl shadow-soft p-6">

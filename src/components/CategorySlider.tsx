@@ -8,17 +8,22 @@ interface CategorySliderProps {
 
 const CategorySlider: React.FC<CategorySliderProps> = ({ categories }) => {
   return (
-    <div className="grid grid-cols-3 md:flex md:space-x-4 md:overflow-x-auto md:pb-2 gap-4 md:gap-0">
+    <div className="grid grid-cols-3 md:flex md:space-x-4 md:overflow-x-auto md:pb-2 gap-4 md:gap-0" role="list">
       {categories.map((category) => (
         <Link
           key={category.id}
           to={`/shop?category=${category.name}`}
-          className="flex flex-col items-center space-y-2 group md:min-w-[100px]"
+          className="flex flex-col items-center space-y-2 group md:min-w-[100px] focus:outline-none focus:ring-2 focus:ring-primary-500 rounded-lg"
+          role="listitem"
         >
           <div className="w-20 h-20 md:w-16 md:h-16 rounded-full overflow-hidden border-2 border-gray-200 group-hover:border-primary-500 transition-colors duration-200">
             <img
               src={category.image}
-              alt={category.name}
+              alt={`${category.name} category`}
+              loading="lazy"
+              decoding="async"
+              width="80"
+              height="80"
               className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-200"
             />
           </div>

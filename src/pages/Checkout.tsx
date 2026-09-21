@@ -1,43 +1,57 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useCart } from '../contexts/CartContext';
 import { useAuth } from '../contexts/AuthContext';
-import { useUserAddresses } from '../hooks/useUserAddresses';
-import AddressCard from '../components/checkout/AddressCard';
-import AddAddressModal from '../components/checkout/AddAddressModal';
-import type { UserAddress, AddressFormData } from '../types/address';
-import { Plus, MapPin } from 'lucide-react';
-import { createRazorpayOrder, verifyPayment, loadRazorpayScript } from '../services/razorpayService';
+import { AddressProvider, useAddress } from '../contexts/AddressContext';
+import AddressManager from '../components/address/AddressManager';
+import { createPaidOrder } from '../services/paymentService';
+import { razorpayService } from '../services/razorpayService';
+import { getDeliverySettings, calculateDeliveryFee } from '../services/settingsService';
+import { Loader2, AlertCircle, CheckCircle } from 'lucide-react';
 
-import logo from '../assets/Puscart logo.jpeg'
-
-const Checkout: React.FC = () => {
-    const { state: cartState } = useCart();
+const CheckoutContent: React.FC = () => {
+  // Call all hooks first - this is required by React rules
+  const { state: cartState, clearCart } = useCart();
   const { appUser } = useAuth();
-  
-  // Address management states
-  const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [editingAddress, setEditingAddress] = useState<UserAddress | null>(null);
-  
+  const location = useLocation();
   const navigate = useNavigate();
   const [isProcessing, setIsProcessing] = useState(false);
-  
-  // Custom hook for address management
+  const [orderError, setOrderError] = useState<string>('');
+  const [orderSuccess, setOrderSuccess] = useState(false);
+  const [deliverySettings, setDeliverySettings] = useState<any>(null);
+
+  // Unified address management
   const {
     addresses,
-    loading: addressesLoading,
     error: addressesError,
-    addAddress,
-    updateAddress,
-    deleteAddress,
-    setDefaultAddress,
+    selectedAddressId,
     getDefaultAddress,
-  } = useUserAddresses(appUser?.id);
+    clearError,
+  } = useAddress();
 
+  // Get coupon data from navigation state
+  const couponData = location.state as {
+    appliedCoupon?: any;
+    discountAmount?: number;
+  } || {};
+
+  // Fetch delivery settings on component mount
+  useEffect(() => {
+    const fetchDeliverySettings = async () => {
+      try {
+        const settings = await getDeliverySettings();
+        setDeliverySettings(settings);
+      } catch (error) {
+        console.error('Error fetching delivery settings:', error);
+      }
+    };
+    fetchDeliverySettings();
+  }, []);
+
+  // Early return after all hooks are called
   if (cartState.items.length === 0) {
     return (
-      <div className="min-h-screen bg-background pt-20 flex items-center justify-center">
+      <div className="min-h-screen bg-background pt-14 md:pt-20 flex items-center justify-center">
         <div className="text-center">
           <h2 className="text-2xl font-bold text-gray-900 mb-4">Your cart is empty</h2>
           <Link to="/shop" className="btn-primary">
@@ -48,64 +62,18 @@ const Checkout: React.FC = () => {
     );
   }
 
-  // Auto-select default address when addresses load
-  useEffect(() => {
-    if (addresses.length > 0 && !selectedAddressId) {
-      const defaultAddr = getDefaultAddress();
-      setSelectedAddressId(defaultAddr?.id || addresses[0].id);
+  const handlePlaceOrder = async () => {
+    // Prevent multiple simultaneous order attempts
+    if (isProcessing) {
+      return;
     }
-  }, [addresses, selectedAddressId, getDefaultAddress]);
 
-  const handleAddressSelect = (addressId: string) => {
-    setSelectedAddressId(addressId);
-  };
+    const defaultAddress = getDefaultAddress();
+    const addressToUse = selectedAddressId
+      ? addresses.find(addr => addr.id === selectedAddressId)
+      : defaultAddress;
 
-  const handleAddAddress = () => {
-    setEditingAddress(null);
-    setIsAddModalOpen(true);
-  };
-
-  const handleEditAddress = (address: UserAddress) => {
-    setEditingAddress(address);
-    setIsAddModalOpen(true);
-  };
-
-  const handleSaveAddress = async (addressData: AddressFormData) => {
-    try {
-      if (editingAddress) {
-        await updateAddress(editingAddress.id, addressData);
-      } else {
-        await addAddress(addressData);
-      }
-    } catch (error: any) {
-      alert(error.message);
-    }
-  };
-
-  const handleDeleteAddress = async (addressId: string) => {
-    if (window.confirm('Are you sure you want to delete this address?')) {
-      try {
-        await deleteAddress(addressId);
-        // Clear selection if deleted address was selected
-        if (selectedAddressId === addressId) {
-          setSelectedAddressId(null);
-        }
-      } catch (error: any) {
-        alert(error.message);
-      }
-    }
-  };
-
-  const handleSetDefaultAddress = async (addressId: string) => {
-    try {
-      await setDefaultAddress(addressId);
-    } catch (error: any) {
-      alert(error.message);
-    }
-  };
-
-  const handlePayment = async () => {
-    if (!selectedAddressId) {
+    if (!addressToUse) {
       alert('Please select a delivery address');
       return;
     }
@@ -122,153 +90,129 @@ const Checkout: React.FC = () => {
       return;
     }
 
-    // Step 5: Prevent double-click checkout
-    if (isProcessing) {
+    // Validate cart state
+    if (cartState.items.length === 0) {
+      alert('Your cart is empty. Please add items before checkout.');
       return;
     }
 
+    // Validate cart items
+    for (const item of cartState.items) {
+      if (!item.product || !item.product.id || item.quantity <= 0) {
+        alert('Invalid cart items detected. Please refresh and try again.');
+        return;
+      }
+
+      const price = item.product.offer_price || item.product.price;
+      if (!price || price <= 0 || price > 100000) {
+        alert('Invalid product prices detected. Please refresh and try again.');
+        return;
+      }
+    }
+
+    // Server-side amount validation will happen in payment service
+    // But we do basic client validation for better UX
+    if (total <= 0 || total > 100000) {
+      alert('Invalid order total. Please check your cart.');
+      return;
+    }
+
+    // Validate coupon if applied
+    if (couponData.appliedCoupon && discountAmount > 0) {
+      if (discountAmount >= cartState.total) {
+        alert('Invalid discount applied. Please remove coupon and try again.');
+        return;
+      }
+    }
+
     setIsProcessing(true);
+    setOrderError('');
+    setOrderSuccess(false);
+
 
     try {
-      // Get selected address details
-      const selectedAddress = addresses.find(addr => addr.id === selectedAddressId);
-      if (!selectedAddress) {
-        throw new Error('Selected address not found');
+      // Razorpay flow with verification
+      let paymentResponse;
+      try {
+        paymentResponse = await razorpayService.processPayment(total, {
+          receipt: `receipt_${appUser.id}_${Date.now()}`
+        });
+      } catch (paymentError: any) {
+        // Check if it's an authentication error
+        if (paymentError.message?.includes('not authenticated') ||
+          paymentError.message?.includes('Session expired') ||
+          paymentError.message?.includes('login again')) {
+          setOrderError('Your session has expired. Please login again to continue.');
+          // Redirect to login after a short delay
+          setTimeout(() => {
+            navigate('/login', { state: { from: '/checkout' } });
+          }, 2000);
+          return;
+        }
+
+        // Re-throw other payment errors
+        throw paymentError;
       }
 
-      // Format delivery address string
-      const formattedAddress = `${selectedAddress.address_line_1}${selectedAddress.address_line_2 ? ', ' + selectedAddress.address_line_2 : ''}, ${selectedAddress.city}, ${selectedAddress.state} - ${selectedAddress.pincode}`;
-
-      // Load Razorpay script
-      const scriptLoaded = await loadRazorpayScript();
-      if (!scriptLoaded) {
-        throw new Error('Failed to load Razorpay SDK');
-      }
-
-      // Create Razorpay order with complete order data
-      const razorpayOrder = await createRazorpayOrder({
-        amount: total,
-        user_id: appUser.id,
-        delivery_address: formattedAddress,
-        phone: selectedAddress.phone_number,
-        cart_items: cartState.items.map(item => ({
+      // After successful payment verification, create the order with payment details
+      const order = await createPaidOrder({
+        total_amount: total,
+        delivery_address: `${addressToUse.address_line_1}${addressToUse.address_line_2 ? ', ' + addressToUse.address_line_2 : ''}, ${addressToUse.city}, ${addressToUse.state} - ${addressToUse.pincode}`,
+        phone: addressToUse.phone_number,
+        delivery_address_id: addressToUse.id,
+        payment_status: 'paid',
+        razorpay_order_id: paymentResponse.razorpay_order_id,
+        razorpay_payment_id: paymentResponse.razorpay_payment_id,
+        payment_record_id: paymentResponse.verification?.payment_record_id,
+        items: cartState.items.map(item => ({
           product_id: item.product.id,
           quantity: item.quantity,
           price: item.product.offer_price || item.product.price
         }))
       });
 
-      // Order is already created in backend with Razorpay order ID, no need to update
+      setOrderSuccess(true);
 
-      // Open Razorpay checkout
-      const options = {
-        key: import.meta.env.VITE_RAZORPAY_KEY_ID,
-        amount: razorpayOrder.amount,
-        currency: 'INR',
-        name: 'Puscart Delivery',
-        description: `Order #${razorpayOrder.order_id}`,
-        order_id: razorpayOrder.razorpay_order_id,
-        image: logo,
-        prefill: {
-          name: appUser?.name || '',
-          email: appUser?.email || '',
-          contact: selectedAddress.phone_number || ''
-        },
-        notes: {
-          address: formattedAddress,
-          order_id: razorpayOrder.order_id,
-          user_id: appUser.id
-        },
-        config: {
-          display: {
-            blocks: {
-              banks: {
-                name: 'Pay using UPI Apps',
-                instruments: [
-                  {
-                    method: 'upi',
-                    apps: ['gpay', 'phonepe', 'paytm', 'bhim']
-                  }
-                ]
-              }
-            },
-            hide: [
-              {
-                method: 'card'
-              },
-              {
-                method: 'wallet'
-              }
-            ],
-            sequence: ['block.banks', 'block.upi'],
-            preferences: {
-              show_default_blocks: true
+      // Clear cart after successful order
+      clearCart();
+
+      // Dispatch event to refresh orders in My Orders page
+      window.dispatchEvent(new CustomEvent('order-placed'));
+
+      // Redirect to success page immediately after receiving order confirmation
+      if (order?.id) {
+        setTimeout(() => {
+          navigate('/order-success', {
+            state: {
+              orderId: order.id,
+              orderData: order // Passing extra data for immediate summary display
             }
-          }
-        },
-        handler: async function (response: any) {
-          try {
-            console.log('Razorpay response:', response);
-            
-            // Verify payment with backend
-            await verifyPayment({
-              razorpay_payment_id: response.razorpay_payment_id,
-              razorpay_order_id: response.razorpay_order_id,
-              razorpay_signature: response.razorpay_signature
-            });
-
-            console.log('Payment verified successfully');
-            
-            // Clear cart after successful payment
-            // TODO: Implement cart clearing
-            
-            // Redirect to success page
-            navigate('/order-success', { state: { orderId: razorpayOrder.order_id } });
-          } catch (error) {
-            console.error('Payment verification failed:', error);
-            alert('Payment verification failed. Please contact support if amount was deducted.');
-          }
-        },
-        modal: {
-          ondismiss: async function () {
-            console.log('Payment modal dismissed');
-            setIsProcessing(false);
-          },
-          escape: true,
-          handleback: true,
-          confirm_close: true,
-          animation: 'fade'
-        },
-        theme: {
-          color: '#00C4CC',
-          backdrop_color: '#ffffff'
-        },
-        retry: {
-          enabled: true,
-          max_count: 4
-        }
-      };
-
-      const paymentObject = new (window as any).Razorpay(options);
-      paymentObject.open();
+          });
+        }, 300);
+      } else {
+        throw new Error('Order placed but confirmation not received.');
+      }
 
     } catch (error: any) {
-      console.error('Payment error:', error);
-      alert(error.message || 'Payment failed. Please try again.');
+      setOrderError(error.message || 'Failed to place order. Please try again.');
     } finally {
+      // Ensure cleanup regardless of success/failure
       setIsProcessing(false);
     }
   };
 
-  const deliveryFee = cartState.total >= 300 ? 0 : 50;
+
+  const deliveryFee = calculateDeliveryFee(cartState.total, deliverySettings);
   const tax = cartState.total * 0.00;
-  const total = cartState.total + deliveryFee + tax;
+  const discountAmount = couponData.discountAmount || 0;
+  const subtotalAfterDiscount = cartState.total - discountAmount;
+  const total = subtotalAfterDiscount + deliveryFee + tax;
 
   return (
-    <div className="min-h-screen bg-background pt-20">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+    <div className="min-h-screen bg-background pt-14 md:pt-20">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 md:py-6">
         <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-6">Checkout</h1>
-        
+
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Checkout Form */}
           <div className="lg:col-span-2">
@@ -277,78 +221,156 @@ const Checkout: React.FC = () => {
               <div className="bg-white rounded-2xl shadow-soft p-6">
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-lg font-semibold text-gray-900">Delivery Address</h2>
-                  <button
-                    onClick={handleAddAddress}
-                    className="flex items-center space-x-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
-                  >
-                    <Plus className="w-4 h-4" />
-                    <span>Add New Address</span>
-                  </button>
                 </div>
-                
+
                 {addressesError && (
                   <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
                     <p className="text-sm text-red-600">{addressesError}</p>
-                  </div>
-                )}
-                
-                {addressesLoading ? (
-                  <div className="flex items-center justify-center py-8">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
-                  </div>
-                ) : addresses.length === 0 ? (
-                  <div className="text-center py-8">
-                    <MapPin className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-                    <p className="text-gray-600 mb-4">No saved addresses found</p>
                     <button
-                      onClick={handleAddAddress}
-                      className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+                      onClick={clearError}
+                      className="mt-2 text-sm text-red-600 hover:text-red-800 underline"
                     >
-                      Add Your First Address
+                      Dismiss
                     </button>
                   </div>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {addresses.map((address) => (
-                      <AddressCard
-                        key={address.id}
-                        address={address}
-                        isSelected={selectedAddressId === address.id}
-                        onSelect={handleAddressSelect}
-                        onEdit={handleEditAddress}
-                        onDelete={handleDeleteAddress}
-                        onSetDefault={handleSetDefaultAddress}
-                      />
-                    ))}
-                  </div>
                 )}
+
+                <AddressManager
+                  mode="checkout"
+                  compact={false}
+                  showAddButton={true}
+                  onAddressSelect={(_addressId) => {
+                    // Address selection is handled automatically by the context
+                  }}
+                />
               </div>
 
-              {/* Pay with Razorpay Button */}
+
+              {/* Order Processing Status */}
+              {(isProcessing || orderSuccess || orderError) && (
+                <div className="bg-white rounded-2xl shadow-soft p-6 mb-6 border-l-4 transition-all duration-300"
+                  style={{
+                    borderLeftColor: orderSuccess ? '#10b981' :
+                      orderError ? '#ef4444' : '#3b82f6'
+                  }}>
+                  <div className="flex items-center space-x-3">
+                    {isProcessing && (
+                      <>
+                        <div className="relative">
+                          <Loader2 className="w-6 h-6 text-blue-600 animate-spin" />
+                          <div className="absolute inset-0 w-6 h-6 bg-blue-100 rounded-full animate-ping opacity-20"></div>
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-sm font-semibold text-gray-900">Placing Order</span>
+                          <span className="text-xs text-gray-500">Processing your order...</span>
+                        </div>
+                      </>
+                    )}
+                    {orderSuccess && (
+                      <>
+                        <div className="relative">
+                          <CheckCircle className="w-6 h-6 text-green-600" />
+                          <div className="absolute -inset-1 w-8 h-8 bg-green-100 rounded-full animate-ping opacity-20"></div>
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-sm font-semibold text-green-700">Order Placed Successfully!</span>
+                          <span className="text-xs text-green-600">Redirecting to order confirmation...</span>
+                        </div>
+                      </>
+                    )}
+                    {orderError && (
+                      <>
+                        <AlertCircle className="w-6 h-6 text-red-600" />
+                        <div className="flex flex-col">
+                          <span className="text-sm font-semibold text-red-700">Order Failed</span>
+                          <span className="text-xs text-red-600">Please try again</span>
+                        </div>
+                      </>
+                    )}
+                  </div>
+
+                  {orderError && (
+                    <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg animate-fade-in">
+                      <div className="flex items-start space-x-2">
+                        <AlertCircle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-red-800">Order Error</p>
+                          <p className="text-sm text-red-600 mt-1">{orderError}</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Premium Razorpay Payment Button */}
               <button
-                onClick={handlePayment}
-                disabled={isProcessing}
-                className="w-full bg-linear-to-r from-blue-600 to-cyan-600 text-white font-semibold py-4 px-6 rounded-xl hover:from-blue-700 hover:to-cyan-700 transition-all duration-200 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+                onClick={handlePlaceOrder}
+                disabled={isProcessing || orderSuccess}
+                className={`
+                  w-full font-semibold py-5 px-6 rounded-2xl transition-all duration-300 
+                  flex items-center justify-center space-x-3 relative overflow-hidden
+                  group shadow-lg hover:shadow-xl transform hover:scale-[1.02] active:scale-[0.98]
+                  ${isProcessing || orderSuccess
+                    ? 'bg-gray-400 text-gray-200 cursor-not-allowed'
+                    : 'bg-linear-to-r from-blue-600 to-blue-700 text-white hover:from-blue-700 hover:to-blue-800'
+                  }
+                `}
               >
+                {/* Razorpay branding icon */}
+                {!isProcessing && !orderSuccess && (
+                  <div className="flex items-center space-x-2 relative z-10">
+                    <svg className="w-6 h-6" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z" />
+                      <path fill="white" d="M10 17l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9z" />
+                    </svg>
+                    <span className="font-medium text-lg">Pay Securely with Razorpay</span>
+                  </div>
+                )}
+
                 {isProcessing ? (
                   <>
-                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                    <span>Processing...</span>
+                    <div className="relative">
+                      <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></div>
+                      <div className="absolute inset-0 rounded-full h-5 w-5 bg-white opacity-20 animate-ping"></div>
+                    </div>
+                    <span className="relative z-10 font-medium">Processing Payment...</span>
                   </>
-                ) : (
+                ) : orderSuccess ? (
                   <>
-                    <span className="text-lg">🔒</span>
-                    <span>Pay Securely with Razorpay</span>
+                    <CheckCircle className="w-5 h-5 relative z-10" />
+                    <span className="relative z-10 font-medium">Payment Successful</span>
                   </>
-                )}
+                ) : null}
               </button>
+
+              {/* Secure Payment Trust Badge */}
+              {!isProcessing && !orderSuccess && (
+                <div className="mt-4 flex flex-col items-center space-y-2">
+                  <div className="flex items-center space-x-2 text-sm text-gray-600">
+                    <svg className="w-4 h-4 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+                    </svg>
+                    <span className="font-medium">100% Secure Payments powered by Razorpay</span>
+                  </div>
+                  <div className="flex items-center space-x-4 text-xs text-gray-500">
+                    <span>UPI</span>
+                    <span>•</span>
+                    <span>Cards</span>
+                    <span>•</span>
+                    <span>Wallets</span>
+                    <span>•</span>
+                    <span>Net Banking</span>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
           {/* Order Summary */}
           <div className="lg:col-span-1">
             <div className="bg-white rounded-2xl shadow-soft p-6">
               <h2 className="text-lg font-semibold text-gray-900 mb-4">Order Summary</h2>
-              
+
               {/* Order Items */}
               <div className="space-y-3 mb-4 max-h-48 overflow-y-auto">
                 {cartState.items.map((item) => (
@@ -356,11 +378,10 @@ const Checkout: React.FC = () => {
                     <img
                       src={item.product.image?.replace('http://localhost:', 'https://') || item.product.image}
                       alt={item.product.name}
-                      className="w-12 h-12 object-cover rounded-lg"
-                      onError={(e) => {
-                        const target = e.target as HTMLImageElement;
-                        target.src = logo;
-                      }}
+                      loading="lazy"
+                      width="48"
+                      height="48"
+                      className="w-12 h-12 rounded object-cover"
                     />
                     <div className="flex-1">
                       <p className="text-sm font-medium text-gray-900">{item.product.name}</p>
@@ -372,13 +393,19 @@ const Checkout: React.FC = () => {
                   </div>
                 ))}
               </div>
-              
+
               {/* Price Breakdown */}
               <div className="border-t border-gray-200 pt-4 space-y-2">
                 <div className="flex justify-between text-gray-600">
                   <span>Subtotal</span>
                   <span>₹{cartState.total.toFixed(2)}</span>
                 </div>
+                {discountAmount > 0 && couponData.appliedCoupon && (
+                  <div className="flex justify-between text-green-600">
+                    <span>Discount ({couponData.appliedCoupon.code})</span>
+                    <span>-₹{discountAmount.toFixed(2)}</span>
+                  </div>
+                )}
                 <div className="flex justify-between text-gray-600">
                   <span>Delivery Fee</span>
                   <span>{deliveryFee === 0 ? 'Free' : `₹${deliveryFee.toFixed(2)}`}</span>
@@ -393,20 +420,52 @@ const Checkout: React.FC = () => {
                     <span>₹{total.toFixed(2)}</span>
                   </div>
                 </div>
+
               </div>
             </div>
           </div>
         </div>
       </div>
-      
-      {/* Add/Edit Address Modal */}
-      <AddAddressModal
-        isOpen={isAddModalOpen}
-        onClose={() => setIsAddModalOpen(false)}
-        onSave={handleSaveAddress}
-        editingAddress={editingAddress}
-      />
     </div>
+  );
+};
+
+const Checkout: React.FC = () => {
+  // Call all hooks first - this is required by React rules
+  const { appUser } = useAuth();
+  const { state: cartState } = useCart();
+
+  // Early returns after all hooks are called
+  if (!appUser) {
+    return (
+      <div className="min-h-screen bg-background pt-14 md:pt-20 flex items-center justify-center">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold text-gray-900 mb-4">Please login to continue</h2>
+          <Link to="/login" className="btn-primary">
+            Login
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  if (cartState.items.length === 0) {
+    return (
+      <div className="min-h-screen bg-background pt-14 md:pt-20 flex items-center justify-center">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold text-gray-900 mb-4">Your cart is empty</h2>
+          <Link to="/shop" className="btn-primary">
+            Start Shopping
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <AddressProvider userId={appUser.id}>
+      <CheckoutContent />
+    </AddressProvider>
   );
 };
 

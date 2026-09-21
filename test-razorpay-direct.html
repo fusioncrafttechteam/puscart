@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Razorpay Function</title>
+</head>
+<body>
+    <h1>Testing Razorpay Order Creation</h1>
+    <button onclick="testFunction()">Test Create Order</button>
+    <div id="result"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script>
+        const supabaseUrl = 'https://tjgklvdmuxnlydwwchso.supabase.co'
+        const supabaseAnonKey = 'sb_publishable_faL1nLybWD8uw9uN3K39Cw_VubwRYfz'
+        const supabase = createClient(supabaseUrl, supabaseAnonKey)
+
+        async function testFunction() {
+            const resultDiv = document.getElementById('result')
+            resultDiv.innerHTML = 'Testing...'
+
+            try {
+                console.log('Testing Razorpay order creation...')
+                
+                // Test without auth first to see what error we get
+                const { data, error } = await supabase.functions.invoke('razorpay-order', {
+                    body: {
+                        amount: 100,
+                        currency: 'INR',
+                        receipt: 'test_receipt_' + Date.now()
+                    }
+                })
+
+                console.log('Response:', { data, error })
+                
+                if (error) {
+                    resultDiv.innerHTML = `<div style="color: red;">Error: ${JSON.stringify(error, null, 2)}</div>`
+                } else {
+                    resultDiv.innerHTML = `<div style="color: green;">Success: ${JSON.stringify(data, null, 2)}</div>`
+                }
+            } catch (error) {
+                console.error('Test failed:', error)
+                resultDiv.innerHTML = `<div style="color: red;">Exception: ${error.message}</div>`
+            }
+        }
+    </script>
+</body>
+</html>

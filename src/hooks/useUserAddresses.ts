@@ -15,10 +15,16 @@ export const useUserAddresses = (userId: string | undefined) => {
     setError(null);
 
     try {
+      // Get the current authenticated user to ensure we use the correct ID for RLS
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        throw new Error('User not authenticated');
+      }
+
       const { data, error } = await supabase
         .from('user_addresses')
         .select('*')
-        .eq('user_id', userId)
+        .eq('user_id', user.id) // Use authenticated user ID for RLS compliance
         .order('is_default', { ascending: false })
         .order('created_at', { ascending: false });
 
@@ -36,11 +42,17 @@ export const useUserAddresses = (userId: string | undefined) => {
     if (!userId) throw new Error('User not authenticated');
 
     try {
+      // Get the current authenticated user to ensure we use the correct ID for RLS
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        throw new Error('User not authenticated');
+      }
+
       const { data, error } = await supabase
         .from('user_addresses')
         .insert([
           {
-            user_id: userId,
+            user_id: user.id, // Use authenticated user ID for RLS compliance
             ...addressData,
           },
         ])
@@ -62,6 +74,12 @@ export const useUserAddresses = (userId: string | undefined) => {
     if (!userId) throw new Error('User not authenticated');
 
     try {
+      // Get the current authenticated user to ensure we use the correct ID for RLS
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        throw new Error('User not authenticated');
+      }
+
       const { data, error } = await supabase
         .from('user_addresses')
         .update({
@@ -69,7 +87,7 @@ export const useUserAddresses = (userId: string | undefined) => {
           updated_at: new Date().toISOString(),
         })
         .eq('id', addressId)
-        .eq('user_id', userId)
+        .eq('user_id', user.id) // Use authenticated user ID for RLS compliance
         .select()
         .single();
 
@@ -88,11 +106,17 @@ export const useUserAddresses = (userId: string | undefined) => {
     if (!userId) throw new Error('User not authenticated');
 
     try {
+      // Get the current authenticated user to ensure we use the correct ID for RLS
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        throw new Error('User not authenticated');
+      }
+
       const { error } = await supabase
         .from('user_addresses')
         .delete()
         .eq('id', addressId)
-        .eq('user_id', userId);
+        .eq('user_id', user.id); // Use authenticated user ID for RLS compliance
 
       if (error) throw error;
       
@@ -108,11 +132,17 @@ export const useUserAddresses = (userId: string | undefined) => {
     if (!userId) throw new Error('User not authenticated');
 
     try {
+      // Get the current authenticated user to ensure we use the correct ID for RLS
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        throw new Error('User not authenticated');
+      }
+
       const { data, error } = await supabase
         .from('user_addresses')
         .update({ is_default: true })
         .eq('id', addressId)
-        .eq('user_id', userId)
+        .eq('user_id', user.id) // Use authenticated user ID for RLS compliance
         .select()
         .single();
 

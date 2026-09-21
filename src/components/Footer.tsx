@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   Mail,
@@ -10,9 +10,23 @@ import {
 } from "lucide-react";
 
 import logo from '../assets/Puscart logo.jpeg'
+import { getDeliverySettings } from '../services/settingsService'
 
 const Footer: React.FC = () => {
   const currentYear = new Date().getFullYear();
+  const [deliverySettings, setDeliverySettings] = useState<any>(null);
+
+  useEffect(() => {
+    const fetchDeliverySettings = async () => {
+      try {
+        const settings = await getDeliverySettings();
+        setDeliverySettings(settings);
+      } catch (error) {
+        console.error('Error fetching delivery settings:', error);
+      }
+    };
+    fetchDeliverySettings();
+  }, []);
 
   const footerSections = [
     {
@@ -30,7 +44,16 @@ const Footer: React.FC = () => {
         { name: "Contact Us", href: "/contact" },
         { name: "About Us", href: "/about" },
         { name: "FAQ", href: "/faq" },
-        { name: "Shipping Info", href: "/shipping" },
+        { name: "Shipping Info", href: "/shipping-policy" },
+      ],
+    },
+    {
+      title: "Legal",
+      links: [
+        { name: "Privacy Policy", href: "/privacy-policy" },
+        { name: "Terms & Conditions", href: "/terms-and-conditions" },
+        { name: "Refund Policy", href: "/refund-policy" },
+        { name: "Cancellation Policy", href: "/cancellation-policy" },
       ],
     },
   ];
@@ -41,7 +64,7 @@ const Footer: React.FC = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
 
         {/* Top Grid Section */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
 
           {/* Company Info */}
           <div className="space-y-4">
@@ -49,6 +72,9 @@ const Footer: React.FC = () => {
               <img 
                 src={logo} 
                 alt="Puscart Logo" 
+                loading="lazy"
+                width="40"
+                height="40"
                 className="w-10 h-10 object-contain rounded-lg"
               />
 
@@ -122,7 +148,7 @@ const Footer: React.FC = () => {
               <div className="flex items-center space-x-2 text-gray-400">
                 <Truck className="w-4 h-4" />
                 <span className="text-sm">
-                  Free Shipping on ₹100
+                  Free Shipping on ₹{deliverySettings?.free_delivery_limit || 100}
                 </span>
               </div>
 

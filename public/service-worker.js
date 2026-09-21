@@ -1,25 +1,22 @@
 // Service Worker for Puscart Delivery
-const CACHE_NAME = 'puscart-v1.0.0';
-const STATIC_CACHE = 'puscart-static-v1';
-const DYNAMIC_CACHE = 'puscart-dynamic-v1';
+const CACHE_NAME = 'puscart-v1.1.0'; // Bumped to force cache invalidation
+const STATIC_CACHE = 'puscart-static-v2'; // Bumped to force cache invalidation
+const DYNAMIC_CACHE = 'puscart-dynamic-v2'; // Bumped to force cache invalidation
 
 // Static assets to cache
 const STATIC_ASSETS = [
   '/',
   '/index.html',
   '/manifest.json',
-  '/src/assets/Puscart logo.jpeg',
-  'https://checkout.razorpay.com/v1/checkout.js'
+  '/icons/puscart-192.jpeg',
+  '/icons/puscart-512.jpeg'
 ];
 
 // Install event - cache static assets
 self.addEventListener('install', (event) => {
-  console.log('🔧 Service Worker: Installing...');
-  
   event.waitUntil(
     caches.open(STATIC_CACHE)
       .then((cache) => {
-        console.log('📦 Service Worker: Caching static assets');
         return cache.addAll(STATIC_ASSETS);
       })
       .then(() => self.skipWaiting())
@@ -28,15 +25,12 @@ self.addEventListener('install', (event) => {
 
 // Activate event - clean up old caches
 self.addEventListener('activate', (event) => {
-  console.log('🚀 Service Worker: Activating...');
-  
   event.waitUntil(
     caches.keys()
       .then((cacheNames) => {
         return Promise.all(
           cacheNames.map((cacheName) => {
             if (cacheName !== STATIC_CACHE && cacheName !== DYNAMIC_CACHE) {
-              console.log('🗑️ Service Worker: Deleting old cache:', cacheName);
               return caches.delete(cacheName);
             }
           })
@@ -51,21 +45,67 @@ self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
   
-  // Skip non-GET requests
-  if (request.method !== 'GET') return;
+  // Skip non-GET requests for caching, but let them through
+  if (request.method !== 'GET') {
+    // For POST/PUT/DELETE requests, always go to network
+    // This includes payment requests, checkout requests, etc.
+    return;
+  }
   
-  // Handle different request types
+  // Handle different request types with enhanced security
   if (url.origin === self.location.origin) {
-    // Same origin requests
-    event.respondWith(handleSameOriginRequest(request));
+    // Same origin requests - but skip critical routes
+    if (url.pathname.includes('/checkout') || 
+        url.pathname.includes('/order') ||
+        url.pathname.includes('/auth/') ||
+        url.pathname.includes('/functions/v1/')) {
+      // Critical checkout/auth routes - always network first
+      event.respondWith(handleCriticalRequest(request));
+    } else {
+      // Regular same origin requests
+      event.respondWith(handleSameOriginRequest(request));
+    }
+  } else if (url.href.includes('supabase.co')) {
+    // All Supabase requests (Edge Functions and REST API) - network only
+    event.respondWith(handleSupabaseRequest(request));
   } else if (url.href.includes('razorpay.com')) {
-    // Razorpay requests - always network first
-    event.respondWith(handleRazorpayRequest(request));
+    // CRITICAL: Razorpay requests must NEVER be intercepted by Service Worker
+    // Bypass Service Worker completely to prevent CSP violations and cache issues
+    return;
   } else {
     // Other cross-origin requests - network only
     event.respondWith(fetch(request));
   }
 });
+
+// Handle critical requests (checkout, order) with network-first strategy
+async function handleCriticalRequest(request) {
+  try {
+    // Don't intercept POST requests or Supabase API calls
+    if (request.method !== 'GET' || 
+        request.url.includes('supabase.co') ||
+        request.url.includes('razorpay.com')) {
+      return fetch(request);
+    }
+    
+    const networkResponse = await fetch(request);
+    
+    return networkResponse;
+  } catch (error) {
+    // For critical requests, don't fall back to cache - let the error propagate
+    throw error;
+  }
+}
+
+// Handle Supabase Edge Functions and API requests
+async function handleSupabaseRequest(request) {
+  try {
+    const networkResponse = await fetch(request);
+    return networkResponse;
+  } catch (error) {
+    throw error;
+  }
+}
 
 // Handle same-origin requests with cache-first strategy
 async function handleSameOriginRequest(request) {
@@ -89,15 +129,11 @@ async function handleSameOriginRequest(request) {
     
     return networkResponse;
   } catch (error) {
-    console.error('❌ Service Worker: Fetch failed:', error);
-    
-    // Try to serve from cache as fallback
     const cachedResponse = await caches.match(request);
     if (cachedResponse) {
       return cachedResponse;
     }
     
-    // Return offline page for HTML requests
     if (request.headers.get('accept')?.includes('text/html')) {
       return new Response('Offline - Please check your internet connection', {
         status: 503,
@@ -110,30 +146,6 @@ async function handleSameOriginRequest(request) {
   }
 }
 
-// Handle Razorpay requests with network-first strategy
-async function handleRazorpayRequest(request) {
-  try {
-    const networkResponse = await fetch(request);
-    
-    // Cache Razorpay script for offline use
-    if (request.url.includes('checkout.js') && networkResponse.ok) {
-      const cache = await caches.open(STATIC_CACHE);
-      cache.put(request, networkResponse.clone());
-    }
-    
-    return networkResponse;
-  } catch (error) {
-    console.error('❌ Service Worker: Razorpay request failed:', error);
-    
-    // Try to serve cached Razorpay script
-    const cachedResponse = await caches.match(request);
-    if (cachedResponse) {
-      return cachedResponse;
-    }
-    
-    throw error;
-  }
-}
 
 // Update cache in background
 async function updateCacheInBackground(request) {
@@ -145,89 +157,10 @@ async function updateCacheInBackground(request) {
       cache.put(request, networkResponse);
     }
   } catch (error) {
-    console.log('🔄 Service Worker: Background update failed:', error);
+    // Silent background update failure
   }
 }
 
-// Handle background sync for offline payments
-self.addEventListener('sync', (event) => {
-  if (event.tag === 'payment-sync') {
-    event.waitUntil(syncPendingPayments());
-  }
-});
-
-// Sync pending payments when back online
-async function syncPendingPayments() {
-  try {
-    console.log('🔄 Service Worker: Syncing pending payments...');
-    
-    // Get pending payments from IndexedDB
-    const pendingPayments = await getPendingPayments();
-    
-    for (const payment of pendingPayments) {
-      try {
-        // Retry payment verification
-        const response = await fetch('/api/verify-payment', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payment.data)
-        });
-        
-        if (response.ok) {
-          // Remove from pending payments
-          await removePendingPayment(payment.id);
-          console.log('✅ Service Worker: Payment synced successfully');
-        }
-      } catch (error) {
-        console.error('❌ Service Worker: Payment sync failed:', error);
-      }
-    }
-  } catch (error) {
-    console.error('❌ Service Worker: Sync failed:', error);
-  }
-}
-
-// IndexedDB helpers for offline payment storage
-async function getPendingPayments() {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open('PuscartDB', 1);
-    
-    request.onerror = () => reject(request.error);
-    request.onsuccess = () => {
-      const db = request.result;
-      const transaction = db.transaction(['pendingPayments'], 'readonly');
-      const store = transaction.objectStore('pendingPayments');
-      const getAllRequest = store.getAll();
-      
-      getAllRequest.onsuccess = () => resolve(getAllRequest.result);
-      getAllRequest.onerror = () => reject(getAllRequest.error);
-    };
-    
-    request.onupgradeneeded = () => {
-      const db = request.result;
-      if (!db.objectStoreNames.contains('pendingPayments')) {
-        db.createObjectStore('pendingPayments', { keyPath: 'id' });
-      }
-    };
-  });
-}
-
-async function removePendingPayment(id) {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open('PuscartDB', 1);
-    
-    request.onerror = () => reject(request.error);
-    request.onsuccess = () => {
-      const db = request.result;
-      const transaction = db.transaction(['pendingPayments'], 'readwrite');
-      const store = transaction.objectStore('pendingPayments');
-      const deleteRequest = store.delete(id);
-      
-      deleteRequest.onsuccess = () => resolve();
-      deleteRequest.onerror = () => reject(deleteRequest.error);
-    };
-  });
-}
 
 // Handle push notifications for order updates
 self.addEventListener('push', (event) => {
@@ -236,8 +169,8 @@ self.addEventListener('push', (event) => {
     
     const options = {
       body: data.body,
-      icon: '/src/assets/Puscart logo.jpeg',
-      badge: '/src/assets/Puscart logo.jpeg',
+      icon: '/icons/puscart-192.jpeg',
+      badge: '/icons/puscart-192.jpeg',
       vibrate: [200, 100, 200],
       data: data,
       actions: [
@@ -263,4 +196,3 @@ self.addEventListener('notificationclick', (event) => {
   }
 });
 
-console.log('🚀 Service Worker: Loaded successfully');

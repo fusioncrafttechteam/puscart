@@ -119,31 +119,36 @@ const AddAddressModal: React.FC<AddAddressModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
+      <div className="bg-white/95 backdrop-blur-md rounded-3xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-white/20 animate-in slide-in-from-bottom-4 duration-300">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200">
+        <div className="flex items-center justify-between p-6 border-b border-gray-200/50 bg-gradient-to-r from-blue-50/50 to-cyan-50/50">
           <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-[#00C4CC] bg-opacity-10 rounded-full flex items-center justify-center">
-              <MapPin className="w-5 h-5 text-[#00C4CC]" />
+            <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-full flex items-center justify-center shadow-lg">
+              <MapPin className="w-6 h-6 text-white" />
             </div>
-            <h2 className="text-xl font-semibold text-gray-900">
-              {editingAddress ? 'Edit Address' : 'Add New Address'}
-            </h2>
+            <div>
+              <h2 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent">
+                {editingAddress ? 'Edit Address' : 'Add New Address'}
+              </h2>
+              <p className="text-sm text-gray-600 mt-1">
+                {editingAddress ? 'Update your delivery address details' : 'Enter your delivery address details'}
+              </p>
+            </div>
           </div>
           <button
             onClick={onClose}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            className="p-3 hover:bg-white/50 rounded-xl transition-all duration-200 hover:scale-105 shadow-md"
           >
-            <X className="w-5 h-5 text-gray-500" />
+            <X className="w-6 h-6 text-gray-500" />
           </button>
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+        <form onSubmit={handleSubmit} className="p-6 space-y-5 bg-white/60 backdrop-blur-sm">
           {/* Full Name */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+          <div className="group">
+            <label className="block text-sm font-semibold text-gray-700 mb-2 group-focus-within:text-blue-600 transition-colors">
               Full Name *
             </label>
             <input
@@ -151,19 +156,22 @@ const AddAddressModal: React.FC<AddAddressModalProps> = ({
               name="full_name"
               value={formData.full_name}
               onChange={handleInputChange}
-              className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-[#00C4CC] focus:border-transparent ${
-                errors.full_name ? 'border-red-500' : 'border-gray-300'
+              className={`w-full px-4 py-3 border-2 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 ${
+                errors.full_name ? 'border-red-500 bg-red-50/50' : 'border-gray-200 hover:border-gray-300 bg-white/70'
               }`}
               placeholder="Enter your full name"
             />
             {errors.full_name && (
-              <p className="mt-1 text-sm text-red-600">{errors.full_name}</p>
+              <p className="mt-2 text-sm text-red-600 flex items-center gap-1">
+                <span className="w-1 h-1 bg-red-500 rounded-full"></span>
+                {errors.full_name}
+              </p>
             )}
           </div>
 
           {/* Phone Number */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+          <div className="group">
+            <label className="block text-sm font-semibold text-gray-700 mb-2 group-focus-within:text-blue-600 transition-colors">
               Phone Number *
             </label>
             <input
@@ -171,55 +179,61 @@ const AddAddressModal: React.FC<AddAddressModalProps> = ({
               name="phone_number"
               value={formData.phone_number}
               onChange={handleInputChange}
-              className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-[#00C4CC] focus:border-transparent ${
-                errors.phone_number ? 'border-red-500' : 'border-gray-300'
+              className={`w-full px-4 py-3 border-2 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 ${
+                errors.phone_number ? 'border-red-500 bg-red-50/50' : 'border-gray-200 hover:border-gray-300 bg-white/70'
               }`}
               placeholder="Enter 10-digit phone number"
             />
             {errors.phone_number && (
-              <p className="mt-1 text-sm text-red-600">{errors.phone_number}</p>
+              <p className="mt-2 text-sm text-red-600 flex items-center gap-1">
+                <span className="w-1 h-1 bg-red-500 rounded-full"></span>
+                {errors.phone_number}
+              </p>
             )}
           </div>
 
           {/* Address Line 1 */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Address Line 1 *
+          <div className="group">
+            <label className="block text-sm font-semibold text-gray-700 mb-2 group-focus-within:text-blue-600 transition-colors">
+              House/Flat/Street *
             </label>
             <input
               type="text"
               name="address_line_1"
               value={formData.address_line_1}
               onChange={handleInputChange}
-              className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-[#00C4CC] focus:border-transparent ${
-                errors.address_line_1 ? 'border-red-500' : 'border-gray-300'
+              className={`w-full px-4 py-3 border-2 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 ${
+                errors.address_line_1 ? 'border-red-500 bg-red-50/50' : 'border-gray-200 hover:border-gray-300 bg-white/70'
               }`}
               placeholder="Street address, building name"
             />
             {errors.address_line_1 && (
-              <p className="mt-1 text-sm text-red-600">{errors.address_line_1}</p>
+              <p className="mt-2 text-sm text-red-600 flex items-center gap-1">
+                <span className="w-1 h-1 bg-red-500 rounded-full"></span>
+                {errors.address_line_1}
+              </p>
             )}
           </div>
 
           {/* Address Line 2 */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Address Line 2
+          <div className="group">
+            <label className="block text-sm font-semibold text-gray-700 mb-2 group-focus-within:text-blue-600 transition-colors">
+              Area/Landmark
             </label>
             <input
               type="text"
               name="address_line_2"
               value={formData.address_line_2}
               onChange={handleInputChange}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#00C4CC] focus:border-transparent"
+              className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 hover:border-gray-300 bg-white/70"
               placeholder="Apartment, suite, unit, building, floor, etc."
             />
           </div>
 
           {/* City, State, Pincode */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+            <div className="group">
+              <label className="block text-sm font-semibold text-gray-700 mb-2 group-focus-within:text-blue-600 transition-colors">
                 City *
               </label>
               <input
@@ -227,18 +241,21 @@ const AddAddressModal: React.FC<AddAddressModalProps> = ({
                 name="city"
                 value={formData.city}
                 onChange={handleInputChange}
-                className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-[#00C4CC] focus:border-transparent ${
-                  errors.city ? 'border-red-500' : 'border-gray-300'
+                className={`w-full px-4 py-3 border-2 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 ${
+                  errors.city ? 'border-red-500 bg-red-50/50' : 'border-gray-200 hover:border-gray-300 bg-white/70'
                 }`}
                 placeholder="City"
               />
               {errors.city && (
-                <p className="mt-1 text-sm text-red-600">{errors.city}</p>
+                <p className="mt-2 text-sm text-red-600 flex items-center gap-1">
+                  <span className="w-1 h-1 bg-red-500 rounded-full"></span>
+                  {errors.city}
+                </p>
               )}
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+            <div className="group">
+              <label className="block text-sm font-semibold text-gray-700 mb-2 group-focus-within:text-blue-600 transition-colors">
                 State *
               </label>
               <input
@@ -246,18 +263,21 @@ const AddAddressModal: React.FC<AddAddressModalProps> = ({
                 name="state"
                 value={formData.state}
                 onChange={handleInputChange}
-                className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-[#00C4CC] focus:border-transparent ${
-                  errors.state ? 'border-red-500' : 'border-gray-300'
+                className={`w-full px-4 py-3 border-2 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 ${
+                  errors.state ? 'border-red-500 bg-red-50/50' : 'border-gray-200 hover:border-gray-300 bg-white/70'
                 }`}
                 placeholder="State"
               />
               {errors.state && (
-                <p className="mt-1 text-sm text-red-600">{errors.state}</p>
+                <p className="mt-2 text-sm text-red-600 flex items-center gap-1">
+                  <span className="w-1 h-1 bg-red-500 rounded-full"></span>
+                  {errors.state}
+                </p>
               )}
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+            <div className="group">
+              <label className="block text-sm font-semibold text-gray-700 mb-2 group-focus-within:text-blue-600 transition-colors">
                 Pincode *
               </label>
               <input
@@ -265,20 +285,23 @@ const AddAddressModal: React.FC<AddAddressModalProps> = ({
                 name="pincode"
                 value={formData.pincode}
                 onChange={handleInputChange}
-                className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-[#00C4CC] focus:border-transparent ${
-                  errors.pincode ? 'border-red-500' : 'border-gray-300'
+                className={`w-full px-4 py-3 border-2 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 ${
+                  errors.pincode ? 'border-red-500 bg-red-50/50' : 'border-gray-200 hover:border-gray-300 bg-white/70'
                 }`}
                 placeholder="6-digit pincode"
               />
               {errors.pincode && (
-                <p className="mt-1 text-sm text-red-600">{errors.pincode}</p>
+                <p className="mt-2 text-sm text-red-600 flex items-center gap-1">
+                  <span className="w-1 h-1 bg-red-500 rounded-full"></span>
+                  {errors.pincode}
+                </p>
               )}
             </div>
           </div>
 
           {/* Landmark */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+          <div className="group">
+            <label className="block text-sm font-semibold text-gray-700 mb-2 group-focus-within:text-blue-600 transition-colors">
               Landmark
             </label>
             <input
@@ -286,57 +309,60 @@ const AddAddressModal: React.FC<AddAddressModalProps> = ({
               name="landmark"
               value={formData.landmark}
               onChange={handleInputChange}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#00C4CC] focus:border-transparent"
+              className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 hover:border-gray-300 bg-white/70"
               placeholder="Nearby landmark for easy identification"
             />
           </div>
 
           {/* Address Type */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+          <div className="group">
+            <label className="block text-sm font-semibold text-gray-700 mb-2 group-focus-within:text-blue-600 transition-colors">
               Address Type
             </label>
             <select
               name="address_type"
               value={formData.address_type}
               onChange={handleInputChange}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#00C4CC] focus:border-transparent"
+              className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 hover:border-gray-300 bg-white/70"
             >
-              <option value="home">Home</option>
-              <option value="work">Work</option>
-              <option value="other">Other</option>
+              <option value="home">🏠 Home</option>
+              <option value="work">🏢 Work</option>
+              <option value="other">📍 Other</option>
             </select>
           </div>
 
           {/* Set as Default */}
-          <div className="flex items-center space-x-3">
+          <div className="flex items-center space-x-3 p-4 bg-blue-50/50 rounded-xl border border-blue-200/50">
             <input
               type="checkbox"
               name="is_default"
               id="is_default"
               checked={formData.is_default}
               onChange={handleInputChange}
-              className="w-4 h-4 text-[#00C4CC] border-gray-300 rounded focus:ring-[#00C4CC]"
+              className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
             />
-            <label htmlFor="is_default" className="text-sm font-medium text-gray-700">
-              Set as default address
+            <label htmlFor="is_default" className="text-sm font-medium text-gray-700 cursor-pointer">
+              <span className="flex items-center gap-2">
+                ⭐ Set as default address
+                <span className="text-xs text-gray-500">(Will be used automatically at checkout)</span>
+              </span>
             </label>
           </div>
 
           {/* Action Buttons */}
-          <div className="flex space-x-3 pt-4 border-t border-gray-200">
+          <div className="flex space-x-3 pt-6 border-t border-gray-200/50">
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+              className="flex-1 px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-all duration-200 font-semibold hover:border-gray-400"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="flex-1 px-4 py-2 bg-[#00C4CC] text-white rounded-lg hover:bg-[#00B5BD] transition-colors"
+              className="flex-1 px-6 py-3 bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-xl hover:from-blue-700 hover:to-cyan-700 transition-all duration-200 font-semibold shadow-lg hover:shadow-xl transform hover:scale-105"
             >
-              {editingAddress ? 'Update Address' : 'Save Address'}
+              {editingAddress ? '✏️ Update Address' : '💾 Save Address'}
             </button>
           </div>
         </form>

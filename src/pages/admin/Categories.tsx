@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react'
 import { supabase } from '../../services/supabase'
-import AdminSidebar from '../../components/AdminSidebar'
+
 import {
   PlusIcon,
   PencilIcon,
   TrashIcon,
   PhotoIcon
 } from '@heroicons/react/24/outline'
+import AdminSidebar from '../../components/AdminSidebar'
 
 interface Category {
   id: string
@@ -15,6 +16,7 @@ interface Category {
   image: string
   is_active: boolean
   display_order: number
+  unit: string
   created_at: string
 }
 
@@ -28,7 +30,8 @@ const AdminCategories: React.FC = () => {
     name: '',
     description: '',
     image: '',
-    is_active: true
+    is_active: true,
+    unit: 'g'
   })
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [submitting, setSubmitting] = useState(false)
@@ -50,7 +53,7 @@ const AdminCategories: React.FC = () => {
       if (error) throw error
       setCategories(data || [])
     } catch (error) {
-      console.error('Error fetching categories:', error)
+      // Error fetching categories
     } finally {
       setLoading(false)
     }
@@ -59,7 +62,7 @@ const AdminCategories: React.FC = () => {
   const handleImageUpload = async (file: File): Promise<string> => {
     const fileExt = file.name.split('.').pop()
     const fileName = `${Date.now()}.${fileExt}`
-    
+
     const { error: uploadError } = await supabase.storage
       .from('categories')
       .upload(fileName, file)
@@ -88,6 +91,7 @@ const AdminCategories: React.FC = () => {
         description: formData.description,
         image: imageUrl,
         is_active: formData.is_active,
+        unit: formData.unit,
         display_order: editingCategory ? editingCategory.display_order : categories.length
       }
 
@@ -110,7 +114,7 @@ const AdminCategories: React.FC = () => {
       setShowModal(false)
       resetForm()
     } catch (error) {
-      console.error('Error saving category:', error)
+      // Error saving category
     } finally {
       setSubmitting(false)
     }
@@ -122,7 +126,8 @@ const AdminCategories: React.FC = () => {
       name: category.name,
       description: category.description,
       image: category.image,
-      is_active: category.is_active
+      is_active: category.is_active,
+      unit: category.unit || 'g'
     })
     setShowModal(true)
   }
@@ -139,7 +144,7 @@ const AdminCategories: React.FC = () => {
       if (error) throw error
       await fetchCategories()
     } catch (error) {
-      console.error('Error deleting category:', error)
+      // Error deleting category
     }
   }
 
@@ -148,7 +153,8 @@ const AdminCategories: React.FC = () => {
       name: '',
       description: '',
       image: '',
-      is_active: true
+      is_active: true,
+      unit: 'g'
     })
     setEditingCategory(null)
     setImageFile(null)
@@ -211,7 +217,7 @@ const AdminCategories: React.FC = () => {
 
       if (error) throw error
     } catch (error) {
-      console.error('Error updating category order:', error)
+      // Error updating category order
       // Revert to original order on error
       setCategories(categories)
     }
@@ -233,8 +239,10 @@ const AdminCategories: React.FC = () => {
     )
   }
 
+
+
   return (
-    <div className="min-h-screen bg-gray-100 flex pt-14 md:pt-20 overflow-x-hidden">
+    <div className="min-h-screen bg-gray-100 flex pt-14 md:pt-0 overflow-x-hidden">
       <AdminSidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
       {/* Main content */}
       <div className="flex-1 w-full max-w-full overflow-x-hidden">
@@ -258,232 +266,257 @@ const AdminCategories: React.FC = () => {
             </div>
           </div>
         </div>
-        
+
         {/* Categories content */}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-8">
 
-        {/* Categories Grid */}
-        <div className="space-y-4">
-          <div className="text-sm text-gray-600 mb-4">
-            Drag and drop categories to reorder them. The order will be reflected on the home page.
-          </div>
-          {categories.map((category, index) => (
-            <div
-              key={category.id}
-              className={`bg-white rounded-lg shadow-md overflow-hidden border-2 transition-all ${
-                dragOverIndex === index ? 'border-blue-500 shadow-lg' : 'border-transparent'
-              }`}
-              draggable
-              onDragStart={(e) => handleDragStart(e, category)}
-              onDragOver={(e) => handleDragOver(e, index)}
-              onDragLeave={handleDragLeave}
-              onDrop={(e) => handleDrop(e, index)}
-              onDragEnd={handleDragEnd}
-            >
-              <div className="flex">
-                {/* Drag Handle */}
-                <div className="w-12 bg-gray-50 flex items-center justify-center cursor-move border-r">
-                  <svg className="w-6 h-6 text-gray-400" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M3 12h18M3 6h18M3 18h18" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-                  </svg>
-                </div>
-                
-                {/* Category Content */}
-                <div className="flex-1 flex">
-                  <div className="w-32 h-24 bg-gray-200">
-                    <img
-                      src={category.image}
-                      alt={category.name}
-                      className="w-full h-full object-cover"
-                    />
+          {/* Categories Grid */}
+          <div className="space-y-4">
+            <div className="text-sm text-gray-600 mb-4">
+              Drag and drop categories to reorder them. The order will be reflected on the home page.
+            </div>
+            {categories.map((category, index) => (
+              <div
+                key={category.id}
+                className={`bg-white rounded-lg shadow-md overflow-hidden border-2 transition-all ${dragOverIndex === index ? 'border-blue-500 shadow-lg' : 'border-transparent'
+                  }`}
+                draggable
+                onDragStart={(e) => handleDragStart(e, category)}
+                onDragOver={(e) => handleDragOver(e, index)}
+                onDragLeave={handleDragLeave}
+                onDrop={(e) => handleDrop(e, index)}
+                onDragEnd={handleDragEnd}
+              >
+                <div className="flex">
+                  {/* Drag Handle */}
+                  <div className="w-12 bg-gray-50 flex items-center justify-center cursor-move border-r">
+                    <svg className="w-6 h-6 text-gray-400" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M3 12h18M3 6h18M3 18h18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                    </svg>
                   </div>
-                  <div className="flex-1 p-4">
-                    <div className="flex justify-between items-start mb-2">
-                      <div>
-                        <h3 className="text-lg font-medium text-gray-900">{category.name}</h3>
-                        <p className="text-sm text-gray-500">Order: {category.display_order}</p>
-                      </div>
-                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                        category.is_active
+
+                  {/* Category Content */}
+                  <div className="flex-1 flex">
+                    <div className="w-32 h-24 bg-gray-200">
+                      <img
+                        src={category.image}
+                        alt={category.name}
+                        loading="lazy"
+                        width="128"
+                        height="96"
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                    <div className="flex-1 p-4">
+                      <div className="flex justify-between items-start mb-2">
+                        <div>
+                          <h3 className="text-lg font-medium text-gray-900">{category.name}</h3>
+                          <p className="text-sm text-gray-500">Order: {category.display_order}</p>
+                        </div>
+                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${category.is_active
                           ? 'bg-green-100 text-green-800'
                           : 'bg-red-100 text-red-800'
-                      }`}>
-                        {category.is_active ? 'Active' : 'Inactive'}
-                      </span>
-                    </div>
-                    <p className="text-sm text-gray-600 mb-4">{category.description}</p>
-                    <div className="flex justify-end space-x-2">
-                      <button
-                        onClick={() => handleEdit(category)}
-                        className="text-blue-600 hover:text-blue-900"
-                      >
-                        <PencilIcon className="h-4 w-4" />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(category.id)}
-                        className="text-red-600 hover:text-red-900"
-                      >
-                        <TrashIcon className="h-4 w-4" />
-                      </button>
+                          }`}>
+                          {category.is_active ? 'Active' : 'Inactive'}
+                        </span>
+                      </div>
+                      <p className="text-sm text-gray-600 mb-4">{category.description}</p>
+                      <div className="flex justify-end space-x-2">
+                        <button
+                          onClick={() => handleEdit(category)}
+                          className="text-blue-600 hover:text-blue-900"
+                        >
+                          <PencilIcon className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(category.id)}
+                          className="text-red-600 hover:text-red-900"
+                        >
+                          <TrashIcon className="h-4 w-4" />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
-            </div>
-          ))}
-        </div>
-
-        {categories.length === 0 && (
-          <div className="text-center py-12">
-            <PhotoIcon className="mx-auto h-12 w-12 text-gray-400" />
-            <h3 className="mt-2 text-sm font-medium text-gray-900">No categories</h3>
-            <p className="mt-1 text-sm text-gray-500">Get started by creating a new category.</p>
+            ))}
           </div>
-        )}
 
-        {/* Modal */}
-        {showModal && (
-          <div className="fixed inset-0 z-50 overflow-y-auto">
-            <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-18">
-              <div 
-                className="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75" 
-                aria-hidden="true"
-                onClick={() => setShowModal(false)}
-              />
+          {categories.length === 0 && (
+            <div className="text-center py-12">
+              <PhotoIcon className="mx-auto h-12 w-12 text-gray-400" />
+              <h3 className="mt-2 text-sm font-medium text-gray-900">No categories</h3>
+              <p className="mt-1 text-sm text-gray-500">Get started by creating a new category.</p>
+            </div>
+          )}
 
-              <div 
-                className="inline-block align-bottom bg-white rounded-2xl text-left overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full lg:max-w-3xl relative z-10 mx-4 sm:mx-auto"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <form onSubmit={handleSubmit}>
-                  <div className="bg-white px-6 pt-6 pb-4 sm:p-8">
-                    <div className="flex items-center justify-between mb-6">
-                      <h3 className="text-xl font-semibold text-gray-900">
-                        {editingCategory ? 'Edit Category' : 'Add New Category'}
-                      </h3>
+          {/* Modal */}
+          {showModal && (
+            <div className="fixed inset-0 z-50 overflow-y-auto">
+              <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-18">
+                <div
+                  className="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75"
+                  aria-hidden="true"
+                  onClick={() => setShowModal(false)}
+                />
+
+                <div
+                  className="inline-block align-bottom bg-white rounded-2xl text-left overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full lg:max-w-3xl relative z-10 mx-4 sm:mx-auto"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <form onSubmit={handleSubmit}>
+                    <div className="bg-white px-6 pt-6 pb-4 sm:p-8">
+                      <div className="flex items-center justify-between mb-6">
+                        <h3 className="text-xl font-semibold text-gray-900">
+                          {editingCategory ? 'Edit Category' : 'Add New Category'}
+                        </h3>
+                        <button
+                          type="button"
+                          onClick={() => setShowModal(false)}
+                          className="text-gray-400 hover:text-gray-600 transition-colors"
+                        >
+                          <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </div>
+
+                      <div className="space-y-6">
+                        {/* Basic Information Section */}
+                        <div>
+                          <h4 className="text-lg font-semibold text-gray-900 mb-4">Basic Information</h4>
+                          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-2">Category Name</label>
+                              <input
+                                type="text"
+                                required
+                                value={formData.name}
+                                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                                placeholder="Enter category name"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-2">Category Image</label>
+                              <input
+                                type="file"
+                                accept="image/*"
+                                onChange={(e) => setImageFile(e.target.files?.[0] || null)}
+                                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                              />
+                            </div>
+                          </div>
+                          <div className="mt-6">
+                            <label className="block text-sm font-medium text-gray-700 mb-2">Description</label>
+                            <textarea
+                              required
+                              rows={3}
+                              value={formData.description}
+                              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                              placeholder="Enter category description"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Image Section */}
+                        <div>
+                          <h4 className="text-lg font-semibold text-gray-900 mb-4">Current Image</h4>
+                          {formData.image && (
+                            <div>
+                              <img
+                                src={formData.image}
+                                alt="Category preview"
+                                loading="lazy"
+                                width="128"
+                                height="128"
+                                className="h-32 w-32 rounded-xl object-cover shadow-md"
+                              />
+                            </div>
+                          )}
+                          {!formData.image && (
+                            <div className="text-sm text-gray-500">
+                              No image uploaded yet
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Unit Section */}
+                        <div>
+                          <h4 className="text-lg font-semibold text-gray-900 mb-4">Measurement Unit</h4>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">Default Unit for Products</label>
+                            <select
+                              value={formData.unit}
+                              onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
+                              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                            >
+                              <option value="kg">kg (Kilogram)</option>
+                              <option value="g">g (Gram)</option>
+                              <option value="L">L (Liter)</option>
+                              <option value="ml">ml (Milliliter)</option>
+                              <option value="pcs">pcs (Pieces)</option>
+                              <option value="pack">pack</option>
+                              <option value="dozen">dozen</option>
+                            </select>
+                            <p className="text-xs text-gray-500 mt-2">This unit will be used as the default for all products in this category.</p>
+                          </div>
+                        </div>
+
+                        {/* Status Section */}
+                        <div>
+                          <h4 className="text-lg font-semibold text-gray-900 mb-4">Status</h4>
+                          <div className="flex items-center">
+                            <input
+                              type="checkbox"
+                              id="is_active"
+                              checked={formData.is_active}
+                              onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
+                              className="h-5 w-5 text-blue-600 focus:ring-blue-500 border-gray-300 rounded-xl"
+                            />
+                            <label htmlFor="is_active" className="ml-3 block text-sm font-medium text-gray-900">
+                              Category is active and visible to customers
+                            </label>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="bg-gray-50 px-6 py-4 sm:px-8 sm:flex sm:flex-row-reverse sm:space-x-3">
+                      <button
+                        type="submit"
+                        disabled={submitting}
+                        className="w-full sm:w-auto inline-flex justify-center items-center px-6 py-3 bg-blue-600 text-white font-medium rounded-xl hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-200 shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {submitting ? (
+                          <>
+                            <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            Saving...
+                          </>
+                        ) : (
+                          <>{editingCategory ? 'Update Category' : 'Create Category'}</>
+                        )}
+                      </button>
                       <button
                         type="button"
                         onClick={() => setShowModal(false)}
-                        className="text-gray-400 hover:text-gray-600 transition-colors"
+                        className="mt-3 sm:mt-0 w-full sm:w-auto inline-flex justify-center items-center px-6 py-3 bg-white text-gray-700 font-medium rounded-xl border border-gray-300 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-200"
                       >
-                        <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
+                        Cancel
                       </button>
                     </div>
-                    
-                    <div className="space-y-6">
-                      {/* Basic Information Section */}
-                      <div>
-                        <h4 className="text-lg font-semibold text-gray-900 mb-4">Basic Information</h4>
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Category Name</label>
-                            <input
-                              type="text"
-                              required
-                              value={formData.name}
-                              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
-                              placeholder="Enter category name"
-                            />
-                          </div>
-
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Category Image</label>
-                            <input
-                              type="file"
-                              accept="image/*"
-                              onChange={(e) => setImageFile(e.target.files?.[0] || null)}
-                              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-                            />
-                          </div>
-                        </div>
-                        <div className="mt-6">
-                          <label className="block text-sm font-medium text-gray-700 mb-2">Description</label>
-                          <textarea
-                            required
-                            rows={3}
-                            value={formData.description}
-                            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                            className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
-                            placeholder="Enter category description"
-                          />
-                        </div>
-                      </div>
-
-                      {/* Image Section */}
-                      <div>
-                        <h4 className="text-lg font-semibold text-gray-900 mb-4">Current Image</h4>
-                        {formData.image && (
-                          <div>
-                            <img
-                              src={formData.image}
-                              alt="Category preview"
-                              className="h-32 w-32 rounded-xl object-cover shadow-md"
-                            />
-                          </div>
-                        )}
-                        {!formData.image && (
-                          <div className="text-sm text-gray-500">
-                            No image uploaded yet
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Status Section */}
-                      <div>
-                        <h4 className="text-lg font-semibold text-gray-900 mb-4">Status</h4>
-                        <div className="flex items-center">
-                          <input
-                            type="checkbox"
-                            id="is_active"
-                            checked={formData.is_active}
-                            onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
-                            className="h-5 w-5 text-blue-600 focus:ring-blue-500 border-gray-300 rounded-xl"
-                          />
-                          <label htmlFor="is_active" className="ml-3 block text-sm font-medium text-gray-900">
-                            Category is active and visible to customers
-                          </label>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="bg-gray-50 px-6 py-4 sm:px-8 sm:flex sm:flex-row-reverse sm:space-x-3">
-                    <button
-                      type="submit"
-                      disabled={submitting}
-                      className="w-full sm:w-auto inline-flex justify-center items-center px-6 py-3 bg-blue-600 text-white font-medium rounded-xl hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-200 shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {submitting ? (
-                        <>
-                          <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                          </svg>
-                          Saving...
-                        </>
-                      ) : (
-                        <>{editingCategory ? 'Update Category' : 'Create Category'}</>
-                      )}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setShowModal(false)}
-                      className="mt-3 sm:mt-0 w-full sm:w-auto inline-flex justify-center items-center px-6 py-3 bg-white text-gray-700 font-medium rounded-xl border border-gray-300 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-200"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </form>
+                  </form>
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
         </div>
       </div>
-
     </div>
   )
 }

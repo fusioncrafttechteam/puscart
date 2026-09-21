@@ -28,7 +28,7 @@ export const ThemeProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         const parsedTheme = JSON.parse(savedTheme);
         setState(parsedTheme);
       } catch (error) {
-        console.error('Failed to parse theme:', error);
+        // Failed to parse theme
       }
     }
   }, []);

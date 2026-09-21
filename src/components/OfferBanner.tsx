@@ -70,6 +70,11 @@ const currentOffer = offers[currentIndex];
         <img
           src={currentOffer.image}
           alt={currentOffer.title}
+          width="1200"
+          height="400"
+          loading="eager"
+          fetchPriority="high"
+          decoding="async"
           className="w-full h-full object-cover"
         />
         <div className="absolute inset-0 bg-gradient-to-r from-black/70 to-black/50 flex items-center justify-center">
@@ -96,28 +101,20 @@ const currentOffer = offers[currentIndex];
       {/* Navigation Buttons - Hidden on Mobile */}
       <button
         onClick={prevSlide}
+        aria-label="Previous offer"
         className="hidden md:block absolute left-4 top-1/2 -translate-y-1/2 bg-white/80 backdrop-blur-sm rounded-full p-2 hover:bg-white transition-colors duration-200"
       >
         <ChevronLeft className="w-4 h-4 text-gray-800" />
       </button>
       <button
         onClick={nextSlide}
+        aria-label="Next offer"
         className="hidden md:block absolute right-4 top-1/2 -translate-y-1/2 bg-white/80 backdrop-blur-sm rounded-full p-2 hover:bg-white transition-colors duration-200"
       >
         <ChevronRight className="w-4 h-4 text-gray-800" />
       </button>
       
-      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex space-x-2">
-        {offers.map((_, index) => (
-          <button
-            key={index}
-            onClick={() => setCurrentIndex(index)}
-            className={`w-2 h-2 rounded-full transition-colors duration-200 ${
-              index === currentIndex ? 'bg-white' : 'bg-white/50'
-            }`}
-          />
-        ))}
-      </div>
+      
     </div>
   );
 };

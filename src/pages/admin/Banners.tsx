@@ -13,6 +13,8 @@ interface OfferBanner {
   title: string
   description: string
   image: string
+  discount: string
+  code: string
   is_active: boolean
   start_date: string
   end_date: string
@@ -29,6 +31,8 @@ const AdminBanners: React.FC = () => {
     title: '',
     description: '',
     image: '',
+    discount: '',
+    code: '',
     is_active: true,
     start_date: '',
     end_date: ''
@@ -51,7 +55,7 @@ const AdminBanners: React.FC = () => {
       if (error) throw error
       setBanners(data || [])
     } catch (error) {
-      console.error('Error fetching banners:', error)
+      // Error fetching banners
     } finally {
       setLoading(false)
     }
@@ -88,6 +92,8 @@ const AdminBanners: React.FC = () => {
         title: formData.title,
         description: formData.description,
         image: imageUrl,
+        discount: formData.discount,
+        code: formData.code,
         is_active: formData.is_active,
         start_date: new Date(formData.start_date).toISOString(),
         end_date: new Date(formData.end_date).toISOString()
@@ -112,7 +118,7 @@ const AdminBanners: React.FC = () => {
       setShowModal(false)
       resetForm()
     } catch (error) {
-      console.error('Error saving banner:', error)
+      // Error saving banner
     } finally {
       setSubmitting(false)
     }
@@ -124,6 +130,8 @@ const AdminBanners: React.FC = () => {
       title: banner.title,
       description: banner.description,
       image: banner.image,
+      discount: banner.discount || '',
+      code: banner.code || '',
       is_active: banner.is_active,
       start_date: new Date(banner.start_date).toISOString().split('T')[0],
       end_date: new Date(banner.end_date).toISOString().split('T')[0]
@@ -143,7 +151,7 @@ const AdminBanners: React.FC = () => {
       if (error) throw error
       await fetchBanners()
     } catch (error) {
-      console.error('Error deleting banner:', error)
+      // Error deleting banner
     }
   }
 
@@ -157,7 +165,7 @@ const AdminBanners: React.FC = () => {
       if (error) throw error
       await fetchBanners()
     } catch (error) {
-      console.error('Error updating banner status:', error)
+      // Error updating banner status
     }
   }
 
@@ -166,6 +174,8 @@ const AdminBanners: React.FC = () => {
       title: '',
       description: '',
       image: '',
+      discount: '',
+      code: '',
       is_active: true,
       start_date: '',
       end_date: ''
@@ -196,7 +206,7 @@ const AdminBanners: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 flex pt-14 md:pt-20 overflow-x-hidden">
+    <div className="min-h-screen bg-gray-100 flex pt-14 md:pt-0 overflow-x-hidden">
       <AdminSidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
       {/* Main content */}
       <div className="flex-1 w-full max-w-full overflow-x-hidden">
@@ -232,6 +242,9 @@ const AdminBanners: React.FC = () => {
                 <img
                   src={banner.image}
                   alt={banner.title}
+                  loading="lazy"
+                  width="400"
+                  height="192"
                   className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
                 />
                 {isBannerActive(banner) && (
@@ -254,6 +267,23 @@ const AdminBanners: React.FC = () => {
                   </span>
                 </div>
                 <p className="text-sm text-gray-600 mb-4 line-clamp-2">{banner.description}</p>
+                
+                {/* Offer Details */}
+                {(banner.discount || banner.code) && (
+                  <div className="bg-blue-50 rounded-lg p-3 mb-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-blue-900">
+                          {banner.discount && `Discount: ${banner.discount}`}
+                        </p>
+                        <p className="text-xs text-blue-700 font-mono">
+                          {banner.code && `Code: ${banner.code}`}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
                 <div className="text-xs text-gray-500 mb-4 space-y-1">
                   <p>Start: {new Date(banner.start_date).toLocaleDateString()}</p>
                   <p>End: {new Date(banner.end_date).toLocaleDateString()}</p>
@@ -368,6 +398,43 @@ const AdminBanners: React.FC = () => {
                         </div>
                       </div>
 
+                      {/* Offer Details Section */}
+                      <div>
+                        <h4 className="text-lg font-semibold text-gray-900 mb-4">Offer Details</h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">Discount Amount</label>
+                            <div className="relative">
+                              <input
+                                type="text"
+                                required
+                                value={formData.discount}
+                                onChange={(e) => setFormData({ ...formData, discount: e.target.value })}
+                                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                                placeholder="e.g., 20% or 50"
+                              />
+                              <p className="text-xs text-gray-500 mt-1">Enter percentage (e.g., 20%) or fixed amount (e.g., 50)</p>
+                            </div>
+                          </div>
+
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">Coupon Code</label>
+                            <div className="relative">
+                              <input
+                                type="text"
+                                required
+                                value={formData.code}
+                                onChange={(e) => setFormData({ ...formData, code: e.target.value.toUpperCase().replace(/\s/g, '') })}
+                                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                                placeholder="e.g., SAVE20"
+                                maxLength={10}
+                              />
+                              <p className="text-xs text-gray-500 mt-1">Unique code for customers to apply this offer</p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
                       {/* Schedule Section */}
                       <div>
                         <h4 className="text-lg font-semibold text-gray-900 mb-4">Schedule</h4>
@@ -403,6 +470,9 @@ const AdminBanners: React.FC = () => {
                             <img
                               src={formData.image}
                               alt="Banner preview"
+                              loading="lazy"
+                              width="128"
+                              height="128"
                               className="h-32 w-32 rounded-xl object-cover shadow-md"
                             />
                           </div>
