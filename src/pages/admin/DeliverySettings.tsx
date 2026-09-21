@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { supabase } from '../../services/supabase'
-import AdminSidebar from '../../components/AdminSidebar'
+import { AdminPageSkeleton } from '../../components/admin/AdminSkeletons'
 import {
   CogIcon,
   CheckIcon,
@@ -18,7 +18,6 @@ interface DeliverySettings {
 }
 
 const DeliverySettings: React.FC = () => {
-  const [sidebarOpen, setSidebarOpen] = useState(false)
   const [settings, setSettings] = useState<DeliverySettings | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -79,21 +78,11 @@ const DeliverySettings: React.FC = () => {
   }
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-100 flex pt-14 md:pt-0">
-        <AdminSidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
-        <div className="flex-1 flex items-center justify-center">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
-        </div>
-      </div>
-    )
+    return <AdminPageSkeleton />
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 flex pt-14 md:pt-0">
-      <AdminSidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
-
-      <div className="flex-1 w-full max-w-full overflow-x-hidden">
+    <div>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-8">
           <div className="mb-8">
             <div className="flex items-center space-x-3">
@@ -244,7 +233,6 @@ const DeliverySettings: React.FC = () => {
             </div>
           )}
         </div>
-      </div>
     </div>
   )
 }

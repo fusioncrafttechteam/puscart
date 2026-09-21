@@ -1,13 +1,11 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Home, Clock, ShoppingCart, User } from 'lucide-react';
+import { useCartItemCount } from '../contexts/CartContext';
 
-interface BottomNavigationProps {
-  cartItemCount: number;
-}
-
-const BottomNavigation: React.FC<BottomNavigationProps> = ({ cartItemCount }) => {
+const BottomNavigation: React.FC = () => {
   const location = useLocation();
+  const cartItemCount = useCartItemCount();
 
   const navItems = [
     { name: 'Home', icon: Home, path: '/' },

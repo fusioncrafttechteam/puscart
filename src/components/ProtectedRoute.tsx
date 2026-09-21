@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react'
+import React from 'react'
 import { Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 
@@ -7,39 +7,30 @@ interface ProtectedRouteProps {
   requireAdmin?: boolean
 }
 
-const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ 
-  children, 
-  requireAdmin = false 
+const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
+  children,
+  requireAdmin = false,
 }) => {
   const { appUser, loading } = useAuth()
   const location = useLocation()
 
-  useEffect(() => {
-    if (!loading && !appUser) {
-      // Redirect to sign in if not authenticated
-      window.location.href = '/signin'
-    }
-  }, [appUser, loading])
-
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
+      <div className="flex min-h-[50vh] items-center justify-center">
+        <div
+          className="h-10 w-10 animate-spin rounded-full border-2 border-sky-600 border-t-transparent"
+          aria-hidden="true"
+        />
+        <span className="sr-only">Checking access</span>
       </div>
     )
   }
 
   if (!appUser) {
-    // Show loading while redirecting
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
-      </div>
-    )
+    return <Navigate to="/signin" replace state={{ from: location }} />
   }
 
   if (requireAdmin && appUser.role !== 'admin') {
-    // Redirect non-admin users to homepage
     return <Navigate to="/" replace state={{ from: location }} />
   }
 

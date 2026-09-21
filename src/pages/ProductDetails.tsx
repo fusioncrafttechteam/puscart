@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Minus, Plus, Truck, Shield, ArrowLeft } from 'lucide-react';
 import { getProductById, getProducts } from '../services/productService';
-import { useCart } from '../contexts/CartContext';
+import { useCartActions } from '../contexts/CartContext';
 import ProductCard from '../components/ProductCard';
 import SkeletonLoader from '../components/SkeletonLoader';
 import MetaTags from '../components/MetaTags';
@@ -13,7 +13,7 @@ import type { ProductWithCategory } from '../types';
 
 const ProductDetails: React.FC = () => {
   const { id } = useParams<{ id: string }>();
-  const { addItem } = useCart();
+  const { addItem } = useCartActions();
   const { addRecentlyViewed } = useRecentlyViewed();
   const [quantity, setQuantity] = useState(1);
   const [selectedImage, setSelectedImage] = useState(0);
@@ -40,7 +40,7 @@ const ProductDetails: React.FC = () => {
           name: data.name,
           image: data.image,
           price: data.price,
-          offer_price: data.offer_price
+          offer_price: data.offer_price ?? undefined
         });
       }
     } catch (error) {

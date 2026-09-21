@@ -4,17 +4,12 @@ import { Menu, X, BarChart3, Home, ShoppingBag, Tag, Image, ClipboardList, Users
 import { useAuth } from '../contexts/AuthContext';
 import logo from '../assets/Puscart logo.jpeg';
 
-interface MobileNavbarProps {
-  isAuthenticated: boolean;
-  cartItemCount: number;
-  isAdmin?: boolean;
-}
-
-const MobileNavbar: React.FC<MobileNavbarProps> = ({ isAuthenticated, isAdmin = false }) => {
+const MobileNavbar: React.FC = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const currentRoute = useLocation();
-  const { signOut } = useAuth();
+  const { appUser, isAdmin, signOut } = useAuth();
   const navigate = useNavigate();
+  const isAuthenticated = !!appUser;
 
   // Check if current route is admin route
   const isAdminRoute = currentRoute.pathname.startsWith('/admin');
@@ -30,6 +25,8 @@ const MobileNavbar: React.FC<MobileNavbarProps> = ({ isAuthenticated, isAdmin = 
     { name: 'Offer Banners', path: '/admin/banners', icon: Image },
     { name: 'Orders', path: '/admin/orders', icon: ClipboardList },
     { name: 'Users', path: '/admin/users', icon: Users },
+    { name: 'Delivery Settings', path: '/admin/delivery-settings', icon: Tag },
+    { name: 'Activity Logs', path: '/admin/activity-logs', icon: ClipboardList },
     ...(isAuthenticated ? [{ name: 'Logout', path: '/logout' }] : []),
   ];
 
@@ -71,8 +68,8 @@ const MobileNavbar: React.FC<MobileNavbarProps> = ({ isAuthenticated, isAdmin = 
             <img
               src={logo}
               alt="Puscart Logo"
-              width="32"
-              height="32"
+              width={32}
+              height={32}
               loading="eager"
               fetchPriority="high"
               decoding="async"

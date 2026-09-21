@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
-import { useCart } from '../contexts/CartContext'
+import { useCartItemCount } from '../contexts/CartContext'
 import {
   Home,
   ShoppingBag,
@@ -23,7 +23,7 @@ import logo from '../assets/Puscart logo.jpeg'
 const Navbar: React.FC = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const { appUser, signOut, isAdmin } = useAuth()
-  const { state: cartState } = useCart()
+  const cartItemCount = useCartItemCount()
   const navigate = useNavigate()
   const location = useLocation()
   
@@ -50,7 +50,7 @@ const Navbar: React.FC = () => {
   ]
 
   return (
-    <nav className="bg-white/95 backdrop-blur-lg shadow-xl border-b border-gray-100 fixed top-0 left-0 right-0 z-60">
+    <nav className="bg-white shadow-xl border-b border-gray-100 fixed top-0 left-0 right-0 z-60">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-20">
           
@@ -60,8 +60,8 @@ const Navbar: React.FC = () => {
               <img 
                 src={logo} 
                 alt="Puscart Logo" 
-                width="48"
-                height="48"
+                width={48}
+                height={48}
                 loading="eager"
                 fetchPriority="high"
                 decoding="async"
@@ -77,18 +77,27 @@ const Navbar: React.FC = () => {
           </div>
 
           {/* Center: Search Bar */}
-          <div className="hidden md:flex flex-1 max-w-lg mx-8">
+          <form
+            className="hidden md:flex flex-1 max-w-lg mx-8"
+            onSubmit={(event) => {
+              event.preventDefault()
+              const formData = new FormData(event.currentTarget)
+              const query = String(formData.get('q') || searchQuery).trim()
+              navigate(query ? `/shop?q=${encodeURIComponent(query)}` : '/shop')
+            }}
+          >
             <div className="relative w-full">
-              <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+              <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
               <input
-                type="text"
+                type="search"
+                name="q"
                 placeholder="Search products, categories..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 hover:bg-gray-100"
               />
             </div>
-          </div>
+          </form>
 
           {/* Right: Navigation Menu, Cart, Profile */}
           <div className="flex items-center space-x-3">
@@ -142,9 +151,9 @@ const Navbar: React.FC = () => {
               className="relative p-3 bg-gray-50 hover:bg-gray-100 rounded-xl transition-all duration-200 group"
             >
               <ShoppingCart className="w-5 h-5 text-gray-600 group-hover:text-blue-600 transition-colors" />
-              {cartState.itemCount > 0 && (
+              {cartItemCount > 0 && (
                 <span className="absolute -top-1 -right-1 bg-blue-600 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-medium shadow-lg">
-                  {cartState.itemCount}
+                  {cartItemCount > 9 ? '9+' : cartItemCount}
                 </span>
               )}
             </Link>

@@ -6,7 +6,7 @@
 import React, { useState, useEffect } from 'react'
 import { adminAuditService } from '../../services/adminAuditService'
 import { useAuth } from '../../contexts/AuthContext'
-import AdminSidebar from '../../components/AdminSidebar'
+import { AdminPageSkeleton } from '../../components/admin/AdminSkeletons'
 import { Shield, Clock, Search, Filter } from 'lucide-react'
 
 interface ActivityLog {
@@ -22,7 +22,6 @@ interface ActivityLog {
 
 const ActivityLogs: React.FC = () => {
   const { isAdmin } = useAuth()
-  const [sidebarOpen, setSidebarOpen] = useState(false)
   const [logs, setLogs] = useState<ActivityLog[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
@@ -84,21 +83,11 @@ const ActivityLogs: React.FC = () => {
   }
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-100 flex pt-14 md:pt-0">
-        <AdminSidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
-        <div className="flex-1 flex items-center justify-center">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
-        </div>
-      </div>
-    )
+    return <AdminPageSkeleton />
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 flex pt-14 md:pt-0 overflow-x-hidden">
-      <AdminSidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
-
-      <div className="flex-1 w-full max-w-full overflow-x-hidden">
+    <div>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-8">
           <div className="mb-6">
             <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
@@ -227,7 +216,6 @@ const ActivityLogs: React.FC = () => {
         </div>
       )}
         </div>
-      </div>
     </div>
   )
 }

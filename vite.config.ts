@@ -20,27 +20,23 @@ export default defineConfig({
     outDir: 'dist',
     assetsDir: 'assets',
     sourcemap: false,
+    target: 'es2022',
+    cssCodeSplit: true,
     rollupOptions: {
       output: {
-        manualChunks: (id) => {
-          if (id.includes('react') && id.includes('react-dom')) {
-            return 'vendor';
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return
+          if (id.includes('recharts') || id.includes('/d3-') || id.includes('victory-vendor')) {
+            return
           }
-          if (id.includes('react-router-dom')) {
-            return 'router';
+          if (id.includes('@supabase')) return 'supabase'
+          if (id.includes('lucide-react') || id.includes('@heroicons')) return 'ui'
+          if (id.includes('react-dom') || id.includes('react-router') || id.includes('/scheduler')) {
+            return 'react-vendor'
           }
-          if (id.includes('@supabase')) {
-            return 'supabase';
-          }
-          if (id.includes('recharts')) {
-            return 'charts';
-          }
-          if (id.includes('@headlessui') || id.includes('@heroicons') || id.includes('lucide-react')) {
-            return 'ui';
-          }
-        }
-      }
-    }
+        },
+      },
+    },
   },
   preview: {
     port: 4173,

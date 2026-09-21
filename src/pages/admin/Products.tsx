@@ -1,13 +1,12 @@
-import React, { useState, useEffect } from 'react'
+import React, { useEffect, useState } from 'react'
+import { Pencil, Plus, Search, Trash2 } from 'lucide-react'
 import { supabase } from '../../services/supabase'
-import AdminSidebar from '../../components/AdminSidebar'
-import {
-  PlusIcon,
-  PencilIcon,
-  TrashIcon,
-  MagnifyingGlassIcon,
-  PhotoIcon
-} from '@heroicons/react/24/outline'
+import { useDebouncedValue } from '../../hooks/useDebouncedValue'
+import StatusBadge from '../../components/admin/StatusBadge'
+import EmptyState from '../../components/admin/EmptyState'
+import Pagination from '../../components/admin/Pagination'
+import ConfirmModal from '../../components/admin/ConfirmModal'
+import { AdminTableSkeleton } from '../../components/admin/AdminSkeletons'
 
 interface Product {
   id: string
@@ -32,147 +31,165 @@ interface Category {
   name: string
 }
 
+const PAGE_SIZE = 12
+
+const emptyForm = {
+  name: '',
+  description: '',
+  category_id: '',
+  price: '',
+  offer_price: '',
+  discount_percentage: '0',
+  stock: '',
+  image: '',
+  is_active: true,
+  popular: false,
+  featured: false,
+  best_selling: false,
+}
+
 const AdminProducts: React.FC = () => {
-  const [sidebarOpen, setSidebarOpen] = useState(false)
   const [products, setProducts] = useState<Product[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('')
+  const [page, setPage] = useState(1)
+  const [total, setTotal] = useState(0)
   const [showModal, setShowModal] = useState(false)
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
-  const [formData, setFormData] = useState({
-    name: '',
-    description: '',
-    category_id: '',
-    price: '',
-    offer_price: '',
-    discount_percentage: '0',
-    stock: '',
-    image: '',
-    is_active: true,
-    popular: false,
-    featured: false,
-    best_selling: false
-  })
+  const [formData, setFormData] = useState(emptyForm)
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const [deleteId, setDeleteId] = useState<string | null>(null)
+  const [deleting, setDeleting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const debouncedSearch = useDebouncedValue(searchTerm, 350)
 
   useEffect(() => {
-    fetchProducts()
-    fetchCategories()
-  }, [])
-
-  const fetchProducts = async () => {
-    try {
-      let query = supabase
-        .from('products')
-        .select(`
-          *,
-          categories(name)
-        `)
-        .order('created_at', { ascending: false })
-
-      if (searchTerm) {
-        query = query.ilike('name', `%${searchTerm}%`)
-      }
-
-      if (selectedCategory) {
-        query = query.eq('category_id', selectedCategory)
-      }
-
-      const { data, error } = await query
-
-      if (error) throw error
-      setProducts(data || [])
-    } catch (error) {
-      // Error fetching products
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const fetchCategories = async () => {
-    try {
-      const { data, error } = await supabase
+    const loadCategories = async () => {
+      const { data, error: categoriesError } = await supabase
         .from('categories')
         .select('id, name')
         .eq('is_active', true)
         .order('name')
 
-      if (error) throw error
+      if (categoriesError) {
+        console.error('Error fetching categories:', categoriesError)
+        return
+      }
       setCategories(data || [])
-    } catch (error) {
-      // Error fetching categories
     }
-  }
+
+    void loadCategories()
+  }, [])
 
   useEffect(() => {
-    fetchProducts()
-  }, [searchTerm, selectedCategory])
+    setPage(1)
+  }, [debouncedSearch, selectedCategory])
+
+  useEffect(() => {
+    const fetchProducts = async () => {
+      setLoading(true)
+      setError(null)
+      try {
+        const from = (page - 1) * PAGE_SIZE
+        const to = from + PAGE_SIZE - 1
+
+        let query = supabase
+          .from('products')
+          .select('*, categories(name)', { count: 'exact' })
+          .order('created_at', { ascending: false })
+          .range(from, to)
+
+        if (debouncedSearch) {
+          query = query.ilike('name', `%${debouncedSearch}%`)
+        }
+        if (selectedCategory) {
+          query = query.eq('category_id', selectedCategory)
+        }
+
+        const { data, error: productsError, count } = await query
+        if (productsError) throw productsError
+        setProducts(data || [])
+        setTotal(count || 0)
+      } catch (fetchError) {
+        console.error('Error fetching products:', fetchError)
+        setError('Unable to load products.')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    void fetchProducts()
+  }, [debouncedSearch, selectedCategory, page])
 
   const handleImageUpload = async (file: File): Promise<string> => {
     const fileExt = file.name.split('.').pop()
     const fileName = `${Date.now()}.${fileExt}`
-
-    const { error: uploadError } = await supabase.storage
-      .from('products')
-      .upload(fileName, file)
-
+    const { error: uploadError } = await supabase.storage.from('products').upload(fileName, file)
     if (uploadError) throw uploadError
-
-    const { data: { publicUrl } } = supabase.storage
-      .from('products')
-      .getPublicUrl(fileName)
-
+    const { data: { publicUrl } } = supabase.storage.from('products').getPublicUrl(fileName)
     return publicUrl
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const resetForm = () => {
+    setFormData(emptyForm)
+    setEditingProduct(null)
+    setImageFile(null)
+  }
+
+  const refreshCurrentPage = async () => {
+    const from = (page - 1) * PAGE_SIZE
+    const to = from + PAGE_SIZE - 1
+    let query = supabase
+      .from('products')
+      .select('*, categories(name)', { count: 'exact' })
+      .order('created_at', { ascending: false })
+      .range(from, to)
+    if (debouncedSearch) query = query.ilike('name', `%${debouncedSearch}%`)
+    if (selectedCategory) query = query.eq('category_id', selectedCategory)
+    const { data, count } = await query
+    setProducts(data || [])
+    setTotal(count || 0)
+  }
+
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault()
     setSubmitting(true)
     try {
       let imageUrl = formData.image
-
-      if (imageFile) {
-        imageUrl = await handleImageUpload(imageFile)
-      }
+      if (imageFile) imageUrl = await handleImageUpload(imageFile)
 
       const productData = {
         name: formData.name,
         description: formData.description,
         category_id: formData.category_id,
-        price: parseFloat(formData.price),
-        offer_price: formData.offer_price ? parseFloat(formData.offer_price) : null,
-        discount_percentage: parseInt(formData.discount_percentage) || 0,
-        stock: parseInt(formData.stock),
+        price: Number.parseFloat(formData.price),
+        offer_price: formData.offer_price ? Number.parseFloat(formData.offer_price) : null,
+        discount_percentage: Number.parseInt(formData.discount_percentage, 10) || 0,
+        stock: Number.parseInt(formData.stock, 10),
         image: imageUrl,
         is_active: formData.is_active,
         popular: formData.popular,
         featured: formData.featured,
-        best_selling: formData.best_selling
+        best_selling: formData.best_selling,
       }
 
       if (editingProduct) {
-        const { error } = await supabase
-          .from('products')
-          .update(productData)
-          .eq('id', editingProduct.id)
-
-        if (error) throw error
+        const { error: updateError } = await supabase.from('products').update(productData).eq('id', editingProduct.id)
+        if (updateError) throw updateError
       } else {
-        const { error } = await supabase
-          .from('products')
-          .insert(productData)
-
-        if (error) throw error
+        const { error: insertError } = await supabase.from('products').insert(productData)
+        if (insertError) throw insertError
       }
 
-      await fetchProducts()
+      await refreshCurrentPage()
       setShowModal(false)
       resetForm()
-    } catch (error) {
-      // Error saving product
+    } catch (saveError) {
+      console.error('Error saving product:', saveError)
     } finally {
       setSubmitting(false)
     }
@@ -192,463 +209,401 @@ const AdminProducts: React.FC = () => {
       is_active: product.is_active,
       popular: product.popular,
       featured: product.featured,
-      best_selling: product.best_selling
+      best_selling: product.best_selling,
     })
     setShowModal(true)
   }
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this product?')) return
-
+  const handleDelete = async () => {
+    if (!deleteId) return
+    setDeleting(true)
     try {
-      const { error } = await supabase
-        .from('products')
-        .delete()
-        .eq('id', id)
-
-      if (error) throw error
-      await fetchProducts()
-    } catch (error) {
-      // Error deleting product
+      const { error: deleteError } = await supabase.from('products').delete().eq('id', deleteId)
+      if (deleteError) throw deleteError
+      await refreshCurrentPage()
+      setDeleteId(null)
+    } catch (deleteError) {
+      console.error('Error deleting product:', deleteError)
+    } finally {
+      setDeleting(false)
     }
   }
 
-  const resetForm = () => {
-    setFormData({
-      name: '',
-      description: '',
-      category_id: '',
-      price: '',
-      offer_price: '',
-      discount_percentage: '0',
-      stock: '',
-      image: '',
-      is_active: true,
-      popular: false,
-      featured: false,
-      best_selling: false
-    })
-    setEditingProduct(null)
-    setImageFile(null)
-  }
-
-  const openModal = () => {
-    resetForm()
-    setShowModal(true)
-  }
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
-      </div>
-    )
-  }
+  const inputClass =
+    'w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-900 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500/20'
 
   return (
-    <div className="min-h-screen bg-gray-100 flex overflow-x-hidden pt-14 md:pt-0">
-      <AdminSidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
+    <div className="space-y-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-sm text-slate-500">Create, edit, and organize store products.</p>
+        <button
+          type="button"
+          onClick={() => {
+            resetForm()
+            setShowModal(true)
+          }}
+          className="inline-flex items-center justify-center gap-2 rounded-lg bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500"
+        >
+          <Plus className="h-4 w-4" aria-hidden="true" />
+          Add product
+        </button>
+      </div>
 
-      {/* Main content */}
-      <div className="flex-1 w-full max-w-full overflow-x-hidden">
-        {/* Top bar - Same as Dashboard */}
-        <div className="bg-white shadow-sm border-b border-gray-200">
-          <div className="px-4 sm:px-6 lg:px-8">
-            <div className="flex justify-between items-center h-16">
-              {/* Page title */}
-              <div className="flex-1">
-                <h1 className="text-2xl font-bold text-gray-900">Products</h1>
-              </div>
-
-              {/* Add Product button */}
-              <button
-                onClick={openModal}
-                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
-              >
-                <PlusIcon className="h-4 w-4 mr-2" />
-                Add Product
-              </button>
-            </div>
-          </div>
+      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+          <label className="relative block">
+            <span className="sr-only">Search products</span>
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <input
+              type="search"
+              value={searchTerm}
+              onChange={(event) => setSearchTerm(event.target.value)}
+              placeholder="Search products..."
+              className={`${inputClass} pl-9`}
+            />
+          </label>
+          <label>
+            <span className="sr-only">Filter by category</span>
+            <select
+              value={selectedCategory}
+              onChange={(event) => setSelectedCategory(event.target.value)}
+              className={inputClass}
+            >
+              <option value="">All categories</option>
+              {categories.map((category) => (
+                <option key={category.id} value={category.id}>
+                  {category.name}
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
+      </div>
 
-        {/* Products content */}
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-8">
-          {/* Filters */}
-          <div className="bg-white p-6 rounded-xl shadow-sm mb-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="relative">
-                <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder="Search products..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
-                />
-              </div>
-              <select
-                value={selectedCategory}
-                onChange={(e) => setSelectedCategory(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
-              >
-                <option value="">All Categories</option>
-                {categories.map((category) => (
-                  <option key={category.id} value={category.id}>
-                    {category.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
+      {error && (
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
+          {error}
         </div>
+      )}
 
-        {/* Products Table */}
-        <div className="bg-white shadow rounded-lg overflow-hidden">
-          <div className="overflow-x-auto rounded-xl border">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
+      {loading ? (
+        <AdminTableSkeleton />
+      ) : (
+        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+          <div className="hidden overflow-x-auto lg:block">
+            <table className="min-w-full divide-y divide-slate-200">
+              <thead className="bg-slate-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Image
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Name
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Category
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Price
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Offer Price
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Stock
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Status
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Actions
-                  </th>
+                  {['Product', 'Category', 'Price', 'Stock', 'Status', 'Actions'].map((heading) => (
+                    <th
+                      key={heading}
+                      className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500"
+                    >
+                      {heading}
+                    </th>
+                  ))}
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
+              <tbody className="divide-y divide-slate-100">
                 {products.map((product) => (
-                  <tr key={product.id}>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <img
-                        src={product.image}
-                        alt={product.name}
-                        loading="lazy"
-                        width="48"
-                        height="48"
-                        className="w-12 h-12 rounded-lg object-cover"
+                  <tr key={product.id} className="hover:bg-slate-50">
+                    <td className="px-5 py-3">
+                      <div className="flex items-center gap-3">
+                        <img
+                          src={product.image}
+                          alt=""
+                          width={48}
+                          height={48}
+                          loading="lazy"
+                          decoding="async"
+                          className="h-12 w-12 rounded-lg object-cover"
+                        />
+                        <span className="text-sm font-medium text-slate-900">{product.name}</span>
+                      </div>
+                    </td>
+                    <td className="px-5 py-3 text-sm text-slate-600">{product.categories?.name || '—'}</td>
+                    <td className="px-5 py-3 text-sm text-slate-900">
+                      ₹{product.price.toFixed(2)}
+                      {product.offer_price ? (
+                        <span className="ml-2 text-xs text-emerald-600">offer ₹{product.offer_price.toFixed(2)}</span>
+                      ) : null}
+                    </td>
+                    <td className="px-5 py-3 text-sm text-slate-900">{product.stock}</td>
+                    <td className="px-5 py-3">
+                      <StatusBadge
+                        label={product.is_active ? 'Active' : 'Inactive'}
+                        tone={product.is_active ? 'success' : 'danger'}
                       />
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                      {product.name}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {product.categories?.name}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {product.price}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {product.offer_price ? `-${product.offer_price}` : '-'}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {product.stock}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${product.is_active
-                        ? 'bg-green-100 text-green-800'
-                        : 'bg-red-100 text-red-800'
-                        }`}>
-                        {product.is_active ? 'Active' : 'Inactive'}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <button
-                        onClick={() => handleEdit(product)}
-                        className="text-blue-600 hover:text-blue-900 mr-3"
-                      >
-                        <PencilIcon className="h-4 w-4" />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(product.id)}
-                        className="text-red-600 hover:text-red-900"
-                      >
-                        <TrashIcon className="h-4 w-4" />
-                      </button>
+                    <td className="px-5 py-3">
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleEdit(product)}
+                          className="rounded-md p-1.5 text-sky-600 hover:bg-sky-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500"
+                          aria-label={`Edit ${product.name}`}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setDeleteId(product.id)}
+                          className="rounded-md p-1.5 text-red-600 hover:bg-red-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
+                          aria-label={`Delete ${product.name}`}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
+          </div>
 
-            {products.length === 0 && (
-              <div className="text-center py-12">
-                <PhotoIcon className="mx-auto h-12 w-12 text-gray-400" />
-                <h3 className="mt-2 text-sm font-medium text-gray-900">No products</h3>
-                <p className="mt-1 text-sm text-gray-500">Get started by creating a new product.</p>
+          <div className="divide-y divide-slate-100 lg:hidden">
+            {products.map((product) => (
+              <div key={product.id} className="flex items-start gap-3 p-4">
+                <img
+                  src={product.image}
+                  alt=""
+                  width={56}
+                  height={56}
+                  loading="lazy"
+                  decoding="async"
+                  className="h-14 w-14 rounded-lg object-cover"
+                />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <p className="text-sm font-medium text-slate-900">{product.name}</p>
+                      <p className="text-xs text-slate-500">{product.categories?.name || '—'}</p>
+                    </div>
+                    <StatusBadge
+                      label={product.is_active ? 'Active' : 'Inactive'}
+                      tone={product.is_active ? 'success' : 'danger'}
+                    />
+                  </div>
+                  <p className="mt-1 text-sm text-slate-700">₹{product.price.toFixed(2)} · Stock {product.stock}</p>
+                  <div className="mt-2 flex gap-2">
+                    <button type="button" onClick={() => handleEdit(product)} className="text-sm font-medium text-sky-700">
+                      Edit
+                    </button>
+                    <button type="button" onClick={() => setDeleteId(product.id)} className="text-sm font-medium text-red-600">
+                      Delete
+                    </button>
+                  </div>
+                </div>
               </div>
-            )}
+            ))}
+          </div>
+
+          {products.length === 0 && (
+            <EmptyState
+              title="No products"
+              description="Get started by creating a new product."
+              action={{
+                label: 'Add product',
+                onClick: () => {
+                  resetForm()
+                  setShowModal(true)
+                },
+              }}
+            />
+          )}
+
+          <Pagination page={page} pageSize={PAGE_SIZE} total={total} onPageChange={setPage} />
+        </div>
+      )}
+
+      {showModal && (
+        <div className="fixed inset-0 z-50 overflow-y-auto p-4">
+          <button type="button" className="absolute inset-0 bg-slate-900/50" aria-label="Close dialog" onClick={() => setShowModal(false)} />
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="product-dialog-title"
+            className="relative mx-auto w-full max-w-3xl rounded-2xl bg-white shadow-xl"
+          >
+            <form onSubmit={handleSubmit}>
+              <div className="border-b border-slate-200 px-6 py-4">
+                <h3 id="product-dialog-title" className="text-lg font-semibold text-slate-900">
+                  {editingProduct ? 'Edit product' : 'Add product'}
+                </h3>
+              </div>
+              <div className="space-y-5 px-6 py-5">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <div>
+                    <label htmlFor="product-name" className="mb-1.5 block text-sm font-medium text-slate-700">
+                      Product name
+                    </label>
+                    <input
+                      id="product-name"
+                      required
+                      value={formData.name}
+                      onChange={(event) => setFormData({ ...formData, name: event.target.value })}
+                      className={inputClass}
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="product-category" className="mb-1.5 block text-sm font-medium text-slate-700">
+                      Category
+                    </label>
+                    <select
+                      id="product-category"
+                      required
+                      value={formData.category_id}
+                      onChange={(event) => setFormData({ ...formData, category_id: event.target.value })}
+                      className={inputClass}
+                    >
+                      <option value="">Select a category</option>
+                      {categories.map((category) => (
+                        <option key={category.id} value={category.id}>
+                          {category.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                <div>
+                  <label htmlFor="product-description" className="mb-1.5 block text-sm font-medium text-slate-700">
+                    Description
+                  </label>
+                  <textarea
+                    id="product-description"
+                    required
+                    rows={3}
+                    value={formData.description}
+                    onChange={(event) => setFormData({ ...formData, description: event.target.value })}
+                    className={inputClass}
+                  />
+                </div>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                  <div>
+                    <label htmlFor="product-price" className="mb-1.5 block text-sm font-medium text-slate-700">
+                      Regular price
+                    </label>
+                    <input
+                      id="product-price"
+                      type="number"
+                      required
+                      step="0.01"
+                      value={formData.price}
+                      onChange={(event) => setFormData({ ...formData, price: event.target.value })}
+                      className={inputClass}
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="product-offer" className="mb-1.5 block text-sm font-medium text-slate-700">
+                      Offer price
+                    </label>
+                    <input
+                      id="product-offer"
+                      type="number"
+                      step="0.01"
+                      value={formData.offer_price}
+                      onChange={(event) => setFormData({ ...formData, offer_price: event.target.value })}
+                      className={inputClass}
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="product-discount" className="mb-1.5 block text-sm font-medium text-slate-700">
+                      Discount %
+                    </label>
+                    <input
+                      id="product-discount"
+                      type="number"
+                      min="0"
+                      max="100"
+                      value={formData.discount_percentage}
+                      onChange={(event) => setFormData({ ...formData, discount_percentage: event.target.value })}
+                      className={inputClass}
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="product-stock" className="mb-1.5 block text-sm font-medium text-slate-700">
+                      Stock
+                    </label>
+                    <input
+                      id="product-stock"
+                      type="number"
+                      required
+                      value={formData.stock}
+                      onChange={(event) => setFormData({ ...formData, stock: event.target.value })}
+                      className={inputClass}
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label htmlFor="product-image" className="mb-1.5 block text-sm font-medium text-slate-700">
+                    Product image
+                  </label>
+                  <input
+                    id="product-image"
+                    type="file"
+                    accept="image/*"
+                    onChange={(event) => setImageFile(event.target.files?.[0] || null)}
+                    className={inputClass}
+                  />
+                  {formData.image && (
+                    <img src={formData.image} alt="Current product" className="mt-3 h-20 w-20 rounded-lg object-cover" />
+                  )}
+                </div>
+                <fieldset className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <legend className="mb-1 text-sm font-medium text-slate-700">Homepage sections</legend>
+                  {[
+                    ['popular', 'Popular'],
+                    ['featured', 'Featured'],
+                    ['best_selling', 'Best selling'],
+                    ['is_active', 'Active and visible'],
+                  ].map(([key, label]) => {
+                    const field = key as 'popular' | 'featured' | 'best_selling' | 'is_active'
+                    return (
+                    <label key={key} className="flex items-center gap-2 text-sm text-slate-700">
+                      <input
+                        type="checkbox"
+                        checked={formData[field]}
+                        onChange={(event) => setFormData({ ...formData, [field]: event.target.checked })}
+                        className="h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
+                      />
+                      {label}
+                    </label>
+                    )
+                  })}
+                </fieldset>
+              </div>
+              <div className="flex flex-col-reverse gap-2 border-t border-slate-200 bg-slate-50 px-6 py-4 sm:flex-row sm:justify-end">
+                <button
+                  type="button"
+                  onClick={() => setShowModal(false)}
+                  className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="rounded-lg bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-700 disabled:opacity-60"
+                >
+                  {submitting ? 'Saving...' : editingProduct ? 'Update product' : 'Create product'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
+      )}
 
-        {/* Modal */}
-        {showModal && (
-          <div className="fixed inset-0 z-50 overflow-y-auto">
-            <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-18">
-              <div
-                className="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75"
-                aria-hidden="true"
-                onClick={() => setShowModal(false)}
-              />
-
-              <div
-                className="inline-block align-bottom bg-white rounded-2xl text-left overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full lg:max-w-5xl relative z-10 mx-4 sm:mx-auto"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <form onSubmit={handleSubmit}>
-                  <div className="bg-white px-6 pt-6 pb-4 sm:p-8">
-                    <div className="flex items-center justify-between mb-6">
-                      <h3 className="text-xl font-semibold text-gray-900">
-                        {editingProduct ? 'Edit Product' : 'Add New Product'}
-                      </h3>
-                      <button
-                        type="button"
-                        onClick={() => setShowModal(false)}
-                        className="text-gray-400 hover:text-gray-600 transition-colors"
-                      >
-                        <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      </button>
-                    </div>
-
-                    <div className="space-y-6">
-                      {/* Basic Information Section */}
-                      <div>
-                        <h4 className="text-lg font-semibold text-gray-900 mb-4">Basic Information</h4>
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Product Name</label>
-                            <input
-                              type="text"
-                              required
-                              value={formData.name}
-                              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
-                              placeholder="Enter product name"
-                            />
-                          </div>
-
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Category</label>
-                            <select
-                              required
-                              value={formData.category_id}
-                              onChange={(e) => setFormData({ ...formData, category_id: e.target.value })}
-                              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
-                            >
-                              <option value="">Select a category</option>
-                              {categories.map((category) => (
-                                <option key={category.id} value={category.id}>
-                                  {category.name}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-                        </div>
-                        <div className="lg:col-span-2">
-                          <label className="block text-sm font-medium text-gray-700 mb-2">Description</label>
-                          <textarea
-                            required
-                            rows={3}
-                            value={formData.description}
-                            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                            className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
-                            placeholder="Enter product description"
-                          />
-                        </div>
-                      </div>
-
-                      {/* Pricing Section */}
-                      <div>
-                        <h4 className="text-lg font-semibold text-gray-900 mb-4">Pricing</h4>
-                        <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Regular Price</label>
-                            <input
-                              type="number"
-                              required
-                              step="0.01"
-                              value={formData.price}
-                              onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
-                              placeholder="0.00"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Offer Price (Optional)</label>
-                            <input
-                              type="number"
-                              step="0.01"
-                              value={formData.offer_price}
-                              onChange={(e) => setFormData({ ...formData, offer_price: e.target.value })}
-                              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
-                              placeholder="0.00"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Discount Percentage (%)</label>
-                            <input
-                              type="number"
-                              min="0"
-                              max="100"
-                              value={formData.discount_percentage}
-                              onChange={(e) => setFormData({ ...formData, discount_percentage: e.target.value })}
-                              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
-                              placeholder="0"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Stock Quantity</label>
-                            <input
-                              type="number"
-                              required
-                              value={formData.stock}
-                              onChange={(e) => setFormData({ ...formData, stock: e.target.value })}
-                              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
-                              placeholder="0"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Product Image</label>
-                            <input
-                              type="file"
-                              accept="image/*"
-                              onChange={(e) => setImageFile(e.target.files?.[0] || null)}
-                              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-                            />
-                          </div>
-                        </div>
-                        {formData.image && (
-                          <div className="mt-4">
-                            <p className="text-sm font-medium text-gray-700 mb-2">Current Image</p>
-                            <img
-                              src={formData.image}
-                              alt="Product preview"
-                              loading="lazy"
-                              width="128"
-                              height="128"
-                              className="h-32 w-32 rounded-xl object-cover shadow-md"
-                            />
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Homepage Sections */}
-                      <div>
-                        <h4 className="text-lg font-semibold text-gray-900 mb-4">Homepage Sections</h4>
-                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                          <div className="flex items-center">
-                            <input
-                              type="checkbox"
-                              id="popular"
-                              checked={formData.popular}
-                              onChange={(e) => setFormData({ ...formData, popular: e.target.checked })}
-                              className="h-5 w-5 text-blue-600 focus:ring-blue-500 border-gray-300 rounded-xl"
-                            />
-                            <label htmlFor="popular" className="ml-3 block text-sm font-medium text-gray-900">
-                              Mark as Popular Product
-                            </label>
-                          </div>
-                          <div className="flex items-center">
-                            <input
-                              type="checkbox"
-                              id="featured"
-                              checked={formData.featured}
-                              onChange={(e) => setFormData({ ...formData, featured: e.target.checked })}
-                              className="h-5 w-5 text-blue-600 focus:ring-blue-500 border-gray-300 rounded-xl"
-                            />
-                            <label htmlFor="featured" className="ml-3 block text-sm font-medium text-gray-900">
-                              Mark as Featured Product
-                            </label>
-                          </div>
-                          <div className="flex items-center">
-                            <input
-                              type="checkbox"
-                              id="best_selling"
-                              checked={formData.best_selling}
-                              onChange={(e) => setFormData({ ...formData, best_selling: e.target.checked })}
-                              className="h-5 w-5 text-blue-600 focus:ring-blue-500 border-gray-300 rounded-xl"
-                            />
-                            <label htmlFor="best_selling" className="ml-3 block text-sm font-medium text-gray-900">
-                              Mark as Best Selling Product
-                            </label>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Status Section */}
-                      <div>
-                        <h4 className="text-lg font-semibold text-gray-900 mb-4">Status</h4>
-                        <div className="flex items-center">
-                          <input
-                            type="checkbox"
-                            id="is_active"
-                            checked={formData.is_active}
-                            onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
-                            className="h-5 w-5 text-blue-600 focus:ring-blue-500 border-gray-300 rounded-xl"
-                          />
-                          <label htmlFor="is_active" className="ml-3 block text-sm font-medium text-gray-900">
-                            Product is active and visible to customers
-                          </label>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="bg-gray-50 px-6 py-4 sm:px-8 sm:flex sm:flex-row-reverse sm:space-x-3">
-                    <button
-                      type="submit"
-                      disabled={submitting}
-                      className="w-full sm:w-auto inline-flex justify-center items-center px-6 py-3 bg-blue-600 text-white font-medium rounded-xl hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-200 shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {submitting ? (
-                        <>
-                          <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                          </svg>
-                          Saving...
-                        </>
-                      ) : (
-                        <>{editingProduct ? 'Update Product' : 'Create Product'}</>
-                      )}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setShowModal(false)}
-                      className="mt-3 sm:mt-0 w-full sm:w-auto inline-flex justify-center items-center px-6 py-3 bg-white text-gray-700 font-medium rounded-xl border border-gray-300 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-200"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </form>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
+      <ConfirmModal
+        open={Boolean(deleteId)}
+        title="Delete product"
+        message="This product will be permanently removed from the catalog."
+        confirmLabel="Delete"
+        danger
+        loading={deleting}
+        onConfirm={() => void handleDelete()}
+        onClose={() => setDeleteId(null)}
+      />
     </div>
-
   )
 }
 

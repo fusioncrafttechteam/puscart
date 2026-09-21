@@ -1,13 +1,10 @@
-import React, { useState, useEffect } from 'react'
+import React, { useEffect, useState } from 'react'
+import { GripVertical, Pencil, Plus, Trash2 } from 'lucide-react'
 import { supabase } from '../../services/supabase'
-
-import {
-  PlusIcon,
-  PencilIcon,
-  TrashIcon,
-  PhotoIcon
-} from '@heroicons/react/24/outline'
-import AdminSidebar from '../../components/AdminSidebar'
+import StatusBadge from '../../components/admin/StatusBadge'
+import EmptyState from '../../components/admin/EmptyState'
+import ConfirmModal from '../../components/admin/ConfirmModal'
+import { AdminTableSkeleton } from '../../components/admin/AdminSkeletons'
 
 interface Category {
   id: string
@@ -16,507 +13,358 @@ interface Category {
   image: string
   is_active: boolean
   display_order: number
-  unit: string
   created_at: string
 }
 
+const emptyForm = {
+  name: '',
+  description: '',
+  image: '',
+  is_active: true,
+}
+
 const AdminCategories: React.FC = () => {
-  const [sidebarOpen, setSidebarOpen] = useState(false)
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
   const [editingCategory, setEditingCategory] = useState<Category | null>(null)
-  const [formData, setFormData] = useState({
-    name: '',
-    description: '',
-    image: '',
-    is_active: true,
-    unit: 'g'
-  })
+  const [formData, setFormData] = useState(emptyForm)
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [draggedCategory, setDraggedCategory] = useState<Category | null>(null)
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
-
-
-  useEffect(() => {
-    fetchCategories()
-  }, [])
+  const [deleteId, setDeleteId] = useState<string | null>(null)
+  const [deleting, setDeleting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const fetchCategories = async () => {
+    setLoading(true)
+    setError(null)
     try {
-      const { data, error } = await supabase
+      const { data, error: categoriesError } = await supabase
         .from('categories')
         .select('*')
         .order('display_order', { ascending: true })
-
-      if (error) throw error
+      if (categoriesError) throw categoriesError
       setCategories(data || [])
-    } catch (error) {
-      // Error fetching categories
+    } catch (fetchError) {
+      console.error('Error fetching categories:', fetchError)
+      setError('Unable to load categories.')
     } finally {
       setLoading(false)
     }
   }
 
+  useEffect(() => {
+    void fetchCategories()
+  }, [])
+
   const handleImageUpload = async (file: File): Promise<string> => {
     const fileExt = file.name.split('.').pop()
     const fileName = `${Date.now()}.${fileExt}`
-
-    const { error: uploadError } = await supabase.storage
-      .from('categories')
-      .upload(fileName, file)
-
+    const { error: uploadError } = await supabase.storage.from('categories').upload(fileName, file)
     if (uploadError) throw uploadError
-
-    const { data: { publicUrl } } = supabase.storage
-      .from('categories')
-      .getPublicUrl(fileName)
-
+    const { data: { publicUrl } } = supabase.storage.from('categories').getPublicUrl(fileName)
     return publicUrl
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const resetForm = () => {
+    setFormData(emptyForm)
+    setEditingCategory(null)
+    setImageFile(null)
+  }
+
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault()
     setSubmitting(true)
     try {
       let imageUrl = formData.image
-
-      if (imageFile) {
-        imageUrl = await handleImageUpload(imageFile)
-      }
+      if (imageFile) imageUrl = await handleImageUpload(imageFile)
 
       const categoryData = {
         name: formData.name,
         description: formData.description,
         image: imageUrl,
         is_active: formData.is_active,
-        unit: formData.unit,
-        display_order: editingCategory ? editingCategory.display_order : categories.length
+        display_order: editingCategory ? editingCategory.display_order : categories.length,
       }
 
       if (editingCategory) {
-        const { error } = await supabase
-          .from('categories')
-          .update(categoryData)
-          .eq('id', editingCategory.id)
-
-        if (error) throw error
+        const { error: updateError } = await supabase.from('categories').update(categoryData).eq('id', editingCategory.id)
+        if (updateError) throw updateError
       } else {
-        const { error } = await supabase
-          .from('categories')
-          .insert(categoryData)
-
-        if (error) throw error
+        const { error: insertError } = await supabase.from('categories').insert(categoryData)
+        if (insertError) throw insertError
       }
 
       await fetchCategories()
       setShowModal(false)
       resetForm()
-    } catch (error) {
-      // Error saving category
+    } catch (saveError) {
+      console.error('Error saving category:', saveError)
     } finally {
       setSubmitting(false)
     }
   }
 
-  const handleEdit = (category: Category) => {
-    setEditingCategory(category)
-    setFormData({
-      name: category.name,
-      description: category.description,
-      image: category.image,
-      is_active: category.is_active,
-      unit: category.unit || 'g'
-    })
-    setShowModal(true)
-  }
-
-  const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this category?')) return
-
+  const handleDelete = async () => {
+    if (!deleteId) return
+    setDeleting(true)
     try {
-      const { error } = await supabase
-        .from('categories')
-        .delete()
-        .eq('id', id)
-
-      if (error) throw error
+      const { error: deleteError } = await supabase.from('categories').delete().eq('id', deleteId)
+      if (deleteError) throw deleteError
       await fetchCategories()
-    } catch (error) {
-      // Error deleting category
+      setDeleteId(null)
+    } catch (deleteError) {
+      console.error('Error deleting category:', deleteError)
+    } finally {
+      setDeleting(false)
     }
   }
 
-  const resetForm = () => {
-    setFormData({
-      name: '',
-      description: '',
-      image: '',
-      is_active: true,
-      unit: 'g'
-    })
-    setEditingCategory(null)
-    setImageFile(null)
-  }
-
-  const openModal = () => {
-    resetForm()
-    setShowModal(true)
-  }
-
-  // Drag and drop handlers
-  const handleDragStart = (e: React.DragEvent, category: Category) => {
-    setDraggedCategory(category)
-    e.dataTransfer.effectAllowed = 'move'
-  }
-
-  const handleDragOver = (e: React.DragEvent, index: number) => {
-    e.preventDefault()
-    e.dataTransfer.dropEffect = 'move'
-    setDragOverIndex(index)
-  }
-
-  const handleDragLeave = () => {
+  const handleDrop = async (event: React.DragEvent, dropIndex: number) => {
+    event.preventDefault()
     setDragOverIndex(null)
-  }
-
-  const handleDrop = async (e: React.DragEvent, dropIndex: number) => {
-    e.preventDefault()
-    setDragOverIndex(null)
-
     if (!draggedCategory) return
 
-    const draggedIndex = categories.findIndex(cat => cat.id === draggedCategory.id)
+    const draggedIndex = categories.findIndex((category) => category.id === draggedCategory.id)
     if (draggedIndex === dropIndex) return
 
-    // Reorder categories
     const newCategories = [...categories]
     newCategories.splice(draggedIndex, 1)
     newCategories.splice(dropIndex, 0, draggedCategory)
-
-    // Update display_order for all categories
     const updatedCategories = newCategories.map((category, index) => ({
       ...category,
-      display_order: index
+      display_order: index,
     }))
-
     setCategories(updatedCategories)
 
-    // Update database
     try {
-      const { error } = await supabase
-        .from('categories')
-        .upsert(
-          updatedCategories.map(cat => ({
-            id: cat.id,
-            display_order: cat.display_order
-          })),
-          { onConflict: 'id' }
-        )
-
-      if (error) throw error
-    } catch (error) {
-      // Error updating category order
-      // Revert to original order on error
+      const { error: upsertError } = await supabase.from('categories').upsert(
+        updatedCategories.map((category) => ({
+          id: category.id,
+          display_order: category.display_order,
+        })),
+        { onConflict: 'id' }
+      )
+      if (upsertError) throw upsertError
+    } catch (reorderError) {
+      console.error('Error updating category order:', reorderError)
       setCategories(categories)
     }
 
     setDraggedCategory(null)
   }
 
-  const handleDragEnd = () => {
-    setDraggedCategory(null)
-    setDragOverIndex(null)
-  }
-
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
-      </div>
-    )
-  }
-
-
+  const inputClass =
+    'w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-900 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500/20'
 
   return (
-    <div className="min-h-screen bg-gray-100 flex pt-14 md:pt-0 overflow-x-hidden">
-      <AdminSidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
-      {/* Main content */}
-      <div className="flex-1 w-full max-w-full overflow-x-hidden">
-        {/* Top bar */}
-        <div className="bg-white shadow-sm border-b border-gray-200">
-          <div className="px-4 sm:px-6 lg:px-8">
-            <div className="flex justify-between items-center h-16">
-              {/* Page title */}
-              <div className="flex-1">
-                <h1 className="text-2xl font-bold text-gray-900">Categories</h1>
-              </div>
-
-              {/* Add Category button */}
-              <button
-                onClick={openModal}
-                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
-              >
-                <PlusIcon className="h-4 w-4 mr-2" />
-                Add Category
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Categories content */}
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-8">
-
-          {/* Categories Grid */}
-          <div className="space-y-4">
-            <div className="text-sm text-gray-600 mb-4">
-              Drag and drop categories to reorder them. The order will be reflected on the home page.
-            </div>
-            {categories.map((category, index) => (
-              <div
-                key={category.id}
-                className={`bg-white rounded-lg shadow-md overflow-hidden border-2 transition-all ${dragOverIndex === index ? 'border-blue-500 shadow-lg' : 'border-transparent'
-                  }`}
-                draggable
-                onDragStart={(e) => handleDragStart(e, category)}
-                onDragOver={(e) => handleDragOver(e, index)}
-                onDragLeave={handleDragLeave}
-                onDrop={(e) => handleDrop(e, index)}
-                onDragEnd={handleDragEnd}
-              >
-                <div className="flex">
-                  {/* Drag Handle */}
-                  <div className="w-12 bg-gray-50 flex items-center justify-center cursor-move border-r">
-                    <svg className="w-6 h-6 text-gray-400" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M3 12h18M3 6h18M3 18h18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                    </svg>
-                  </div>
-
-                  {/* Category Content */}
-                  <div className="flex-1 flex">
-                    <div className="w-32 h-24 bg-gray-200">
-                      <img
-                        src={category.image}
-                        alt={category.name}
-                        loading="lazy"
-                        width="128"
-                        height="96"
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                    <div className="flex-1 p-4">
-                      <div className="flex justify-between items-start mb-2">
-                        <div>
-                          <h3 className="text-lg font-medium text-gray-900">{category.name}</h3>
-                          <p className="text-sm text-gray-500">Order: {category.display_order}</p>
-                        </div>
-                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${category.is_active
-                          ? 'bg-green-100 text-green-800'
-                          : 'bg-red-100 text-red-800'
-                          }`}>
-                          {category.is_active ? 'Active' : 'Inactive'}
-                        </span>
-                      </div>
-                      <p className="text-sm text-gray-600 mb-4">{category.description}</p>
-                      <div className="flex justify-end space-x-2">
-                        <button
-                          onClick={() => handleEdit(category)}
-                          className="text-blue-600 hover:text-blue-900"
-                        >
-                          <PencilIcon className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(category.id)}
-                          className="text-red-600 hover:text-red-900"
-                        >
-                          <TrashIcon className="h-4 w-4" />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {categories.length === 0 && (
-            <div className="text-center py-12">
-              <PhotoIcon className="mx-auto h-12 w-12 text-gray-400" />
-              <h3 className="mt-2 text-sm font-medium text-gray-900">No categories</h3>
-              <p className="mt-1 text-sm text-gray-500">Get started by creating a new category.</p>
-            </div>
-          )}
-
-          {/* Modal */}
-          {showModal && (
-            <div className="fixed inset-0 z-50 overflow-y-auto">
-              <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-18">
-                <div
-                  className="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75"
-                  aria-hidden="true"
-                  onClick={() => setShowModal(false)}
-                />
-
-                <div
-                  className="inline-block align-bottom bg-white rounded-2xl text-left overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full lg:max-w-3xl relative z-10 mx-4 sm:mx-auto"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <form onSubmit={handleSubmit}>
-                    <div className="bg-white px-6 pt-6 pb-4 sm:p-8">
-                      <div className="flex items-center justify-between mb-6">
-                        <h3 className="text-xl font-semibold text-gray-900">
-                          {editingCategory ? 'Edit Category' : 'Add New Category'}
-                        </h3>
-                        <button
-                          type="button"
-                          onClick={() => setShowModal(false)}
-                          className="text-gray-400 hover:text-gray-600 transition-colors"
-                        >
-                          <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                          </svg>
-                        </button>
-                      </div>
-
-                      <div className="space-y-6">
-                        {/* Basic Information Section */}
-                        <div>
-                          <h4 className="text-lg font-semibold text-gray-900 mb-4">Basic Information</h4>
-                          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                            <div>
-                              <label className="block text-sm font-medium text-gray-700 mb-2">Category Name</label>
-                              <input
-                                type="text"
-                                required
-                                value={formData.name}
-                                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
-                                placeholder="Enter category name"
-                              />
-                            </div>
-
-                            <div>
-                              <label className="block text-sm font-medium text-gray-700 mb-2">Category Image</label>
-                              <input
-                                type="file"
-                                accept="image/*"
-                                onChange={(e) => setImageFile(e.target.files?.[0] || null)}
-                                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-                              />
-                            </div>
-                          </div>
-                          <div className="mt-6">
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Description</label>
-                            <textarea
-                              required
-                              rows={3}
-                              value={formData.description}
-                              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
-                              placeholder="Enter category description"
-                            />
-                          </div>
-                        </div>
-
-                        {/* Image Section */}
-                        <div>
-                          <h4 className="text-lg font-semibold text-gray-900 mb-4">Current Image</h4>
-                          {formData.image && (
-                            <div>
-                              <img
-                                src={formData.image}
-                                alt="Category preview"
-                                loading="lazy"
-                                width="128"
-                                height="128"
-                                className="h-32 w-32 rounded-xl object-cover shadow-md"
-                              />
-                            </div>
-                          )}
-                          {!formData.image && (
-                            <div className="text-sm text-gray-500">
-                              No image uploaded yet
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Unit Section */}
-                        <div>
-                          <h4 className="text-lg font-semibold text-gray-900 mb-4">Measurement Unit</h4>
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Default Unit for Products</label>
-                            <select
-                              value={formData.unit}
-                              onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
-                              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
-                            >
-                              <option value="kg">kg (Kilogram)</option>
-                              <option value="g">g (Gram)</option>
-                              <option value="L">L (Liter)</option>
-                              <option value="ml">ml (Milliliter)</option>
-                              <option value="pcs">pcs (Pieces)</option>
-                              <option value="pack">pack</option>
-                              <option value="dozen">dozen</option>
-                            </select>
-                            <p className="text-xs text-gray-500 mt-2">This unit will be used as the default for all products in this category.</p>
-                          </div>
-                        </div>
-
-                        {/* Status Section */}
-                        <div>
-                          <h4 className="text-lg font-semibold text-gray-900 mb-4">Status</h4>
-                          <div className="flex items-center">
-                            <input
-                              type="checkbox"
-                              id="is_active"
-                              checked={formData.is_active}
-                              onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
-                              className="h-5 w-5 text-blue-600 focus:ring-blue-500 border-gray-300 rounded-xl"
-                            />
-                            <label htmlFor="is_active" className="ml-3 block text-sm font-medium text-gray-900">
-                              Category is active and visible to customers
-                            </label>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="bg-gray-50 px-6 py-4 sm:px-8 sm:flex sm:flex-row-reverse sm:space-x-3">
-                      <button
-                        type="submit"
-                        disabled={submitting}
-                        className="w-full sm:w-auto inline-flex justify-center items-center px-6 py-3 bg-blue-600 text-white font-medium rounded-xl hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-200 shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        {submitting ? (
-                          <>
-                            <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                            </svg>
-                            Saving...
-                          </>
-                        ) : (
-                          <>{editingCategory ? 'Update Category' : 'Create Category'}</>
-                        )}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setShowModal(false)}
-                        className="mt-3 sm:mt-0 w-full sm:w-auto inline-flex justify-center items-center px-6 py-3 bg-white text-gray-700 font-medium rounded-xl border border-gray-300 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-200"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </form>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
+    <div className="space-y-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-sm text-slate-500">
+          Drag and drop categories to reorder them. The order is reflected on the home page.
+        </p>
+        <button
+          type="button"
+          onClick={() => {
+            resetForm()
+            setShowModal(true)
+          }}
+          className="inline-flex items-center justify-center gap-2 rounded-lg bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-700"
+        >
+          <Plus className="h-4 w-4" aria-hidden="true" />
+          Add category
+        </button>
       </div>
+
+      {error && (
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
+          {error}
+        </div>
+      )}
+
+      {loading ? (
+        <AdminTableSkeleton rows={5} />
+      ) : categories.length === 0 ? (
+        <div className="rounded-xl border border-slate-200 bg-white">
+          <EmptyState
+            title="No categories"
+            description="Get started by creating a new category."
+            action={{
+              label: 'Add category',
+              onClick: () => {
+                resetForm()
+                setShowModal(true)
+              },
+            }}
+          />
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {categories.map((category, index) => (
+            <div
+              key={category.id}
+              draggable
+              onDragStart={(event) => {
+                setDraggedCategory(category)
+                event.dataTransfer.effectAllowed = 'move'
+              }}
+              onDragOver={(event) => {
+                event.preventDefault()
+                event.dataTransfer.dropEffect = 'move'
+                setDragOverIndex(index)
+              }}
+              onDragLeave={() => setDragOverIndex(null)}
+              onDrop={(event) => void handleDrop(event, index)}
+              onDragEnd={() => {
+                setDraggedCategory(null)
+                setDragOverIndex(null)
+              }}
+              className={`flex overflow-hidden rounded-xl border bg-white shadow-sm ${
+                dragOverIndex === index ? 'border-sky-400' : 'border-slate-200'
+              }`}
+            >
+              <div className="flex w-10 cursor-move items-center justify-center bg-slate-50 text-slate-400" aria-hidden="true">
+                <GripVertical className="h-5 w-5" />
+              </div>
+              <img
+                src={category.image}
+                alt=""
+                width={96}
+                height={80}
+                loading="lazy"
+                decoding="async"
+                className="h-20 w-24 object-cover sm:h-24 sm:w-32"
+              />
+              <div className="flex min-w-0 flex-1 flex-col justify-between p-4 sm:flex-row sm:items-center">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="text-sm font-semibold text-slate-900">{category.name}</h3>
+                    <StatusBadge
+                      label={category.is_active ? 'Active' : 'Inactive'}
+                      tone={category.is_active ? 'success' : 'danger'}
+                    />
+                  </div>
+                  <p className="mt-1 line-clamp-2 text-sm text-slate-500">{category.description}</p>
+                </div>
+                <div className="mt-3 flex gap-2 sm:mt-0">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingCategory(category)
+                      setFormData({
+                        name: category.name,
+                        description: category.description,
+                        image: category.image,
+                        is_active: category.is_active,
+                      })
+                      setShowModal(true)
+                    }}
+                    className="rounded-md p-1.5 text-sky-600 hover:bg-sky-50"
+                    aria-label={`Edit ${category.name}`}
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDeleteId(category.id)}
+                    className="rounded-md p-1.5 text-red-600 hover:bg-red-50"
+                    aria-label={`Delete ${category.name}`}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {showModal && (
+        <div className="fixed inset-0 z-50 overflow-y-auto p-4">
+          <button type="button" className="absolute inset-0 bg-slate-900/50" aria-label="Close dialog" onClick={() => setShowModal(false)} />
+          <div role="dialog" aria-modal="true" aria-labelledby="category-dialog-title" className="relative mx-auto w-full max-w-xl rounded-2xl bg-white shadow-xl">
+            <form onSubmit={handleSubmit}>
+              <div className="border-b border-slate-200 px-6 py-4">
+                <h3 id="category-dialog-title" className="text-lg font-semibold text-slate-900">
+                  {editingCategory ? 'Edit category' : 'Add category'}
+                </h3>
+              </div>
+              <div className="space-y-4 px-6 py-5">
+                <div>
+                  <label htmlFor="category-name" className="mb-1.5 block text-sm font-medium text-slate-700">
+                    Category name
+                  </label>
+                  <input
+                    id="category-name"
+                    required
+                    value={formData.name}
+                    onChange={(event) => setFormData({ ...formData, name: event.target.value })}
+                    className={inputClass}
+                  />
+                </div>
+                <div>
+                  <label htmlFor="category-description" className="mb-1.5 block text-sm font-medium text-slate-700">
+                    Description
+                  </label>
+                  <textarea
+                    id="category-description"
+                    required
+                    rows={3}
+                    value={formData.description}
+                    onChange={(event) => setFormData({ ...formData, description: event.target.value })}
+                    className={inputClass}
+                  />
+                </div>
+                <div>
+                  <label htmlFor="category-image" className="mb-1.5 block text-sm font-medium text-slate-700">
+                    Category image
+                  </label>
+                  <input
+                    id="category-image"
+                    type="file"
+                    accept="image/*"
+                    onChange={(event) => setImageFile(event.target.files?.[0] || null)}
+                    className={inputClass}
+                  />
+                  {formData.image && (
+                    <img src={formData.image} alt="Current category" className="mt-3 h-20 w-20 rounded-lg object-cover" />
+                  )}
+                </div>
+                <label className="flex items-center gap-2 text-sm text-slate-700">
+                  <input
+                    type="checkbox"
+                    checked={formData.is_active}
+                    onChange={(event) => setFormData({ ...formData, is_active: event.target.checked })}
+                    className="h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
+                  />
+                  Category is active and visible
+                </label>
+              </div>
+              <div className="flex flex-col-reverse gap-2 border-t border-slate-200 bg-slate-50 px-6 py-4 sm:flex-row sm:justify-end">
+                <button type="button" onClick={() => setShowModal(false)} className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700">
+                  Cancel
+                </button>
+                <button type="submit" disabled={submitting} className="rounded-lg bg-sky-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-60">
+                  {submitting ? 'Saving...' : editingCategory ? 'Update category' : 'Create category'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      <ConfirmModal
+        open={Boolean(deleteId)}
+        title="Delete category"
+        message="This category will be permanently removed."
+        confirmLabel="Delete"
+        danger
+        loading={deleting}
+        onConfirm={() => void handleDelete()}
+        onClose={() => setDeleteId(null)}
+      />
     </div>
   )
 }

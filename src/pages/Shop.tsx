@@ -1,63 +1,72 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { X } from 'lucide-react';
 import { getProducts, getCategories } from '../services/productService';
 import ProductCard from '../components/ProductCard';
 import SearchBar from '../components/SearchBar';
 import Footer from '../components/Footer';
-import SkeletonLoader from '../components/SkeletonLoader';
-import MetaTags from '../components/MetaTags';
-import Breadcrumbs from '../components/Breadcrumbs';
+import { SkeletonProductGrid } from '../components/SkeletonLoader';
+import Pagination from '../components/admin/Pagination';
+import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import type { ProductWithCategory, Category } from '../types';
+
+const PAGE_SIZE = 24;
 
 const Shop: React.FC = () => {
   const [searchParams] = useSearchParams();
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState(
+    () => searchParams.get('q') || searchParams.get('search') || ''
+  );
   const [selectedCategory, setSelectedCategory] = useState('');
   const [priceRange, setPriceRange] = useState({ min: 0, max: 2000 });
+  const debouncedSearch = useDebouncedValue(searchQuery, 200);
+  const debouncedPrice = useDebouncedValue(priceRange, 150);
   const [showFilters, setShowFilters] = useState(false);
   const [products, setProducts] = useState<ProductWithCategory[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [filteredProducts, setFilteredProducts] = useState<ProductWithCategory[]>([]);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
 
   useEffect(() => {
-    const category = searchParams.get('category') || '';
-    const search = searchParams.get('search') || '';
-    setSelectedCategory(category);
-    setSearchQuery(search);
+    setSelectedCategory(searchParams.get('category') || '');
+    setSearchQuery(searchParams.get('q') || searchParams.get('search') || '');
   }, [searchParams]);
 
   useEffect(() => {
-    fetchProducts();
-    loadCategories();
+    let cancelled = false;
+
+    const fetchProducts = async () => {
+      try {
+        setLoading(true);
+        const data = await getProducts();
+        if (!cancelled) setProducts(data);
+      } catch (error) {
+        console.error('Error fetching products:', error);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
+    const loadCategories = async () => {
+      try {
+        const data = await getCategories();
+        if (!cancelled) setCategories(data);
+      } catch (error) {
+        console.error('Error fetching categories:', error);
+      }
+    };
+
+    void fetchProducts();
+    void loadCategories();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  const fetchProducts = async () => {
-    try {
-      setLoading(true);
-      const data = await getProducts();
-      setProducts(data);
-    } catch (error) {
-      // Error fetching products
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loadCategories = async () => {
-    try {
-      const data = await getCategories();
-      setCategories(data);
-    } catch (error) {
-      // Error fetching categories
-    }
-  };
-
-  useEffect(() => {
+  const filteredProducts = useMemo(() => {
     let filtered = products;
 
-    // Filter by category
     if (selectedCategory) {
       const selectedCategoryObj = categories.find(cat => cat.name === selectedCategory);
       if (selectedCategoryObj) {
@@ -65,36 +74,42 @@ const Shop: React.FC = () => {
       }
     }
 
-    // Filter by search query
-    if (searchQuery) {
+    if (debouncedSearch) {
+      const query = debouncedSearch.toLowerCase();
       filtered = filtered.filter(product =>
-        product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        product.description.toLowerCase().includes(searchQuery.toLowerCase())
+        product.name.toLowerCase().includes(query) ||
+        product.description.toLowerCase().includes(query)
       );
     }
 
-    // Filter by price range
-    filtered = filtered.filter(product => {
+    return filtered.filter(product => {
       const price = product.offer_price || product.price;
-      return price >= priceRange.min && price <= priceRange.max;
+      return price >= debouncedPrice.min && price <= debouncedPrice.max;
     });
+  }, [debouncedSearch, selectedCategory, debouncedPrice, products, categories]);
 
-    setFilteredProducts(filtered);
-  }, [searchQuery, selectedCategory, priceRange, products, categories]);
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch, selectedCategory, debouncedPrice]);
+
+  const paginatedProducts = useMemo(() => {
+    const start = (page - 1) * PAGE_SIZE;
+    return filteredProducts.slice(start, start + PAGE_SIZE);
+  }, [filteredProducts, page]);
 
   const clearFilters = () => {
     setSearchQuery('');
     setSelectedCategory('');
-    setPriceRange({ min: 0, max: 2000 });
+    setPriceRange({ min: 0, max: 500 });
   };
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background pt-14 md:pt-20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 md:py-6">
+      <div className="min-h-screen bg-background pt-20">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="mb-6">
             <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-4">Shop</h1>
-            <SkeletonLoader />
+            <SkeletonProductGrid count={8} />
           </div>
         </div>
       </div>
@@ -102,14 +117,8 @@ const Shop: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background pt-14 md:pt-10">
-      <MetaTags
-        title="Shop - Puscart Online Grocery"
-        description="Browse our wide selection of fresh groceries, vegetables, fruits, dairy products and more. Get quality products delivered to your doorstep."
-        keywords="shop, online grocery, fresh vegetables, fruits, dairy, Puscart"
-      />
-      <Breadcrumbs />
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 md:py-6">
+    <div className="min-h-screen bg-background pt-14 md:pt-20">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {/* Header */}
         <div className="mb-6">
           <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-4">Shop</h1>
@@ -128,7 +137,6 @@ const Shop: React.FC = () => {
                 <h2 className="font-semibold text-gray-900">Filters</h2>
                 <button
                   onClick={clearFilters}
-                  aria-label="Clear all filters"
                   className="text-sm text-primary-500 hover:text-primary-600"
                 >
                   Clear All
@@ -207,7 +215,6 @@ const Shop: React.FC = () => {
                       ? 'bg-blue-500 text-white'
                       : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                   }`}
-                  aria-label="Show all categories"
                 >
                   All
                 </button>
@@ -220,7 +227,6 @@ const Shop: React.FC = () => {
                         ? 'bg-blue-500 text-white'
                         : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                     }`}
-                    aria-label={`Filter by ${category.name} category`}
                   >
                     {category.name}
                   </button>
@@ -239,12 +245,22 @@ const Shop: React.FC = () => {
             </div>
 
             {/* Products */}
-            {filteredProducts.length > 0 ? (
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-4 gap-4 sm:gap-6">
-                {filteredProducts.map((product) => (
-                  <ProductCard key={product.id} product={product} />
-                ))}
-              </div>
+            {paginatedProducts.length > 0 ? (
+              <>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-4 gap-4 sm:gap-6">
+                  {paginatedProducts.map((product) => (
+                    <ProductCard key={product.id} product={product} />
+                  ))}
+                </div>
+                <div className="mt-6 overflow-hidden rounded-xl border border-slate-200 bg-white">
+                  <Pagination
+                    page={page}
+                    pageSize={PAGE_SIZE}
+                    total={filteredProducts.length}
+                    onPageChange={setPage}
+                  />
+                </div>
+              </>
             ) : (
               <div className="text-center py-12">
                 <div className="text-gray-400 mb-4">
@@ -269,7 +285,6 @@ const Shop: React.FC = () => {
                   <h2 className="font-semibold text-gray-900">Filters</h2>
                   <button
                     onClick={() => setShowFilters(false)}
-                    aria-label="Close filters"
                     className="p-2 rounded-lg hover:bg-gray-100"
                   >
                     <X className="w-5 h-5" />

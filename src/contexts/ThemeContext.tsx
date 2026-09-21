@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+/* eslint-disable react-refresh/only-export-components -- context module also exports useTheme */
 import type { ReactNode } from 'react';
 
 interface ThemeState {
@@ -12,32 +13,31 @@ interface ThemeContextType {
   setPrimaryColor: (color: string) => void;
 }
 
+const DEFAULT_THEME: ThemeState = {
+  isDarkMode: false,
+  primaryColor: '#0EA5E9',
+};
+
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
-export const ThemeProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [state, setState] = useState<ThemeState>({
-    isDarkMode: false,
-    primaryColor: '#0EA5E9',
-  });
-
-  useEffect(() => {
-    // Check for saved theme preferences
+function loadTheme(): ThemeState {
+  try {
     const savedTheme = localStorage.getItem('puscart_theme');
     if (savedTheme) {
-      try {
-        const parsedTheme = JSON.parse(savedTheme);
-        setState(parsedTheme);
-      } catch (error) {
-        // Failed to parse theme
-      }
+      return JSON.parse(savedTheme) as ThemeState;
     }
-  }, []);
+  } catch (error) {
+    console.error('Failed to parse theme:', error);
+  }
+  return DEFAULT_THEME;
+}
+
+export const ThemeProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const [state, setState] = useState<ThemeState>(loadTheme);
 
   useEffect(() => {
-    // Save theme preferences
     localStorage.setItem('puscart_theme', JSON.stringify(state));
-    
-    // Apply dark mode class to body
+
     if (state.isDarkMode) {
       document.documentElement.classList.add('dark');
     } else {
@@ -45,20 +45,22 @@ export const ThemeProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     }
   }, [state]);
 
-  const toggleDarkMode = () => {
+  const toggleDarkMode = useCallback(() => {
     setState(prev => ({ ...prev, isDarkMode: !prev.isDarkMode }));
-  };
+  }, []);
 
-  const setPrimaryColor = (color: string) => {
+  const setPrimaryColor = useCallback((color: string) => {
     setState(prev => ({ ...prev, primaryColor: color }));
-  };
+  }, []);
+
+  const value = useMemo(() => ({
+    state,
+    toggleDarkMode,
+    setPrimaryColor,
+  }), [state, toggleDarkMode, setPrimaryColor]);
 
   return (
-    <ThemeContext.Provider value={{
-      state,
-      toggleDarkMode,
-      setPrimaryColor,
-    }}>
+    <ThemeContext.Provider value={value}>
       {children}
     </ThemeContext.Provider>
   );
